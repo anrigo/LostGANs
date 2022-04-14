@@ -1,3 +1,31 @@
+# Setup
+Conda env
+```
+conda env create -f lost-env.yml
+```
+
+Install g++, for Debian-based systems
+```
+apt install g++ build-essential
+```
+
+Setup roi_layers
+```
+python setup.py build develop
+```
+## Data Preparation
+
+Download COCO dataset to `datasets/coco`
+```
+bash scripts/download_coco.sh
+```
+Download VG dataset to `datasets/vg`
+```
+bash scripts/download_vg.sh
+python scripts/preprocess_vg.py
+```
+
+
 # LostGANs: Image Synthesis From Reconfigurable Layout and Style
 This is implementation of our paper [**Image Synthesis From Reconfigurable Layout and Style**](https://arxiv.org/abs/1908.07500) and [**Learning Layout and Style Reconfigurable GANs for Controllable Image Synthesis**](https://arxiv.org/abs/2003.11571)
 
