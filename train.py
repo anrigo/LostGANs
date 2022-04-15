@@ -7,7 +7,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torchvision.transforms as transforms
+# import torchvision.transforms as transforms
 from tensorboardX import SummaryWriter
 from torchvision.utils import make_grid
 
@@ -19,10 +19,12 @@ from model.rcnn_discriminator import *
 from model.sync_batchnorm import DataParallelWithCallback
 from utils.logger import setup_logger
 
+import wandb
+
 
 def get_dataset(dataset, img_size):
     if dataset == "coco":
-        data = CocoSceneGraphDataset(image_dir='./datasets/coco/train2017/',
+        data = CocoSceneGraphDataset(image_dir='./datasets/coco/images/train2017/',
                                         instances_json='./datasets/coco/annotations/instances_train2017.json',
                                         stuff_json='./datasets/coco/annotations/stuff_train2017.json',
                                         stuff_only=True, image_size=(img_size, img_size), left_right_flip=True)
