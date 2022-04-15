@@ -163,6 +163,7 @@ dependencies:
   - nspr=4.32=h9c3ff4c_1
   - nss=3.77=h2350873_0
   - numpy=1.22.3=py310h45f3432_2
+  - olefile=0.46=pyh9f0ad1d_1
   - openjpeg=2.4.0=hb52868f_1
   - openssl=1.1.1n=h166bdaf_0
   - packaging=21.3=pyhd8ed1ab_0
@@ -175,7 +176,7 @@ dependencies:
   - pcre=8.45=h9c3ff4c_0
   - pexpect=4.8.0=pyh9f0ad1d_2
   - pickleshare=0.7.5=py_1003
-  - pillow=9.1.0=py310he619898_0
+  - pillow=8.4.0=py310h07f4688_0
   - pip=22.0.4=pyhd8ed1ab_0
   - prometheus_client=0.14.1=pyhd8ed1ab_0
   - promise=2.3=py310hff52083_6
