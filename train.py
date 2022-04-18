@@ -19,7 +19,7 @@ from model.rcnn_discriminator import *
 from model.sync_batchnorm import DataParallelWithCallback
 from utils.logger import setup_logger
 
-import wandb
+# import wandb
 
 
 def get_dataset(dataset, img_size):
@@ -169,4 +169,9 @@ if __name__ == "__main__":
     parser.add_argument('--out_path', type=str, default='./outputs/',
                         help='path to output files')
     args = parser.parse_args()
+
+    # train on coco
+    args.dataset = 'coco'
+    args.out_path = 'outputs/'
+
     main(args)

@@ -58,8 +58,12 @@ class ResnetDiscriminator128(nn.Module):
         # obj path
         # seperate different path
         s_idx = ((bbox[:, 3] - bbox[:, 1]) < 64) * ((bbox[:, 4] - bbox[:, 2]) < 64)
-        bbox_l, bbox_s = bbox[1-s_idx], bbox[s_idx]
-        y_l, y_s = y[1-s_idx], y[s_idx]
+        bbox_l, bbox_s = bbox[~s_idx], bbox[s_idx]
+        y_l, y_s = y[~s_idx], y[s_idx]
+
+        # old mask inv
+        # bbox_l, bbox_s = bbox[1-s_idx], bbox[s_idx]
+        # y_l, y_s = y[1-s_idx], y[s_idx]
 
         obj_feat_s = self.block_obj3(x1)
         obj_feat_s = self.block_obj4(obj_feat_s)
