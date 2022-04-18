@@ -19,7 +19,7 @@ from model.rcnn_discriminator import *
 from model.sync_batchnorm import DataParallelWithCallback
 from utils.logger import setup_logger
 
-# import wandb
+import wandb
 
 
 def get_dataset(dataset, img_size):
@@ -36,6 +36,10 @@ def get_dataset(dataset, img_size):
 
 
 def main(args):
+
+    wandb.tensorboard.patch(root_logdir=args.out_path)
+    wandb.init(project='lostgan', sync_tensorboard=True)
+
     # parameters
     img_size = 128
     z_dim = 128
@@ -92,6 +96,7 @@ def main(args):
     vgg_loss = VGGLoss()
     vgg_loss = nn.DataParallel(vgg_loss)
     l1_loss = nn.DataParallel(nn.L1Loss())
+
     for epoch in range(args.total_epoch):
         netG.train()
         netD.train()
@@ -117,6 +122,18 @@ def main(args):
             d_loss.backward()
             d_optimizer.step()
 
+            # print and log losses
+            wandb.log({
+                "epoch": epoch+1,
+                "d_loss": d_loss.item(),
+                "d_loss_real": d_loss_real.item(),
+                "d_loss_fake": d_loss_fake.item(),
+                "d_loss_robj": d_loss_robj.item(),
+                "d_loss_fobj": d_loss_fobj.item()
+                })
+            
+            print(f"Epoch: {epoch+1}, d_loss: {d_loss}")
+
             # update G network
             if (idx % 1) == 0:
                 netG.zero_grad()
@@ -130,6 +147,18 @@ def main(args):
                 g_loss = g_loss_obj * lamb_obj + g_loss_fake * lamb_img + pixel_loss + feat_loss
                 g_loss.backward()
                 g_optimizer.step()
+
+                # print and log losses
+                wandb.log({
+                    "epoch": epoch+1,
+                    "g_loss_fake": g_loss_fake.item(),
+                    "g_loss_obj": g_loss_obj.item(),
+                    "g_loss": g_loss.item(),
+                    "pixel_loss": pixel_loss.item(),
+                    "feat_loss": feat_loss.item()
+                    })
+
+                print(f"Epoch: {epoch+1}, d_loss: {g_loss}")
 
             if (idx+1) % 500 == 0:
                 elapsed = time.time() - start_time
@@ -146,12 +175,20 @@ def main(args):
                                                                                                         g_loss_obj.item()))
                 logger.info("             pixel_loss: {:.4f}, feat_loss: {:.4f}".format(pixel_loss.item(), feat_loss.item()))
 
+
                 writer.add_image("real images", make_grid(real_images.cpu().data * 0.5 + 0.5, nrow=4), epoch*len(dataloader) + idx + 1)
                 writer.add_image("fake images", make_grid(fake_images.cpu().data * 0.5 + 0.5, nrow=4), epoch*len(dataloader) + idx + 1)
+
+                wandb.log({
+                    "real_images": real_images.cpu().data * 0.5 + 0.5,
+                    "fake_images": fake_images.cpu().data * 0.5 + 0.5
+                })
 
         # save model
         if (epoch + 1) % 5 == 0:
             torch.save(netG.state_dict(), os.path.join(args.out_path, 'model/', 'G_%d.pth' % (epoch+1)))
+    
+    wandb.finish()
 
 
 if __name__ == "__main__":
@@ -173,5 +210,6 @@ if __name__ == "__main__":
     # train on coco
     args.dataset = 'coco'
     args.out_path = 'outputs/'
+    args.batch_size = 32
 
     main(args)

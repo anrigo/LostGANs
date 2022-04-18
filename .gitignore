@@ -25,3 +25,5 @@ roi_layers.egg-info/
 .ftpconfig
 
 .ftpignore
+
+wandb
