@@ -4,9 +4,9 @@ Conda env
 conda env create -f lost-env.yml
 ```
 
-Install g++, for Debian-based systems
+Install g++ and cuda toolkit, for Debian-based systems
 ```
-apt install g++ build-essential
+apt install g++ build-essential nvidia-cuda-toolkit
 ```
 
 Setup roi_layers

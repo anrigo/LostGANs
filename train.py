@@ -180,8 +180,8 @@ def main(args):
                 writer.add_image("fake images", make_grid(fake_images.cpu().data * 0.5 + 0.5, nrow=4), epoch*len(dataloader) + idx + 1)
 
                 wandb.log({
-                    "real_images": real_images.cpu().data * 0.5 + 0.5,
-                    "fake_images": fake_images.cpu().data * 0.5 + 0.5
+                    "real_images": wandb.Image(make_grid(real_images.cpu().data * 0.5 + 0.5, nrow=4)),
+                    "fake_images": wandb.Image(make_grid(fake_images.cpu().data * 0.5 + 0.5, nrow=4))
                 })
 
         # save model
@@ -211,5 +211,6 @@ if __name__ == "__main__":
     args.dataset = 'coco'
     args.out_path = 'outputs/'
     args.batch_size = 32
+    args.total_epoch = 200
 
     main(args)
