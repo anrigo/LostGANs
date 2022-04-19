@@ -4,9 +4,21 @@ Conda env
 conda env create -f lost-env.yml
 ```
 
-Install g++ and cuda toolkit, for Debian-based systems
+Install g++ and cuda toolkit (nvcc), for Debian-based systems
 ```
 apt install g++ build-essential nvidia-cuda-toolkit
+```
+
+Only needed if you have to run the project on the IvI cluster:
+```
+# change gcc to a version compatible with pytorch
+source /opt/rh/devtoolset-8/enable
+
+# add nvcc to path
+PATH=$PATH:/usr/local/cuda-10.2/bin/
+
+# check that you can access nvcc
+nvcc --version
 ```
 
 Setup roi_layers
