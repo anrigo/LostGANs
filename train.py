@@ -217,4 +217,4 @@ if __name__ == "__main__":
     # args.batch_size = 32
     # args.total_epoch = 200
 
-    # main(args)
+    main(args)
