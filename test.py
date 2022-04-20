@@ -1,7 +1,8 @@
 import argparse
 from collections import OrderedDict
 import numpy as np
-from scipy import misc
+# from scipy import misc
+from imageio import imsave
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -13,7 +14,7 @@ from utils.util import *
 
 def get_dataloader(dataset = 'coco', img_size=128):
     if dataset == 'coco':
-        dataset = CocoSceneGraphDataset(image_dir='./datasets/coco/val2017/',
+        dataset = CocoSceneGraphDataset(image_dir='./datasets/coco/images/val2017/',
                                         instances_json='./datasets/coco/annotations/instances_val2017.json',
                                         stuff_json='./datasets/coco/annotations/stuff_val2017.json',
                                         stuff_only=True, image_size=(img_size, img_size), left_right_flip=False)
@@ -65,7 +66,7 @@ def main(args):
         z_obj = torch.from_numpy(truncted_random(num_o=num_o, thres=thres)).float().cuda()
         z_im = torch.from_numpy(truncted_random(num_o=1, thres=thres)).view(1, -1).float().cuda()
         fake_images = netG.forward(z_obj, bbox.cuda(), z_im, label.squeeze(dim=-1))
-        misc.imsave("{save_path}/sample_{idx}.jpg".format(save_path=args.sample_path, idx=idx),
+        imsave("{save_path}/sample_{idx}.jpg".format(save_path=args.sample_path, idx=idx),
                     fake_images[0].cpu().detach().numpy().transpose(1, 2, 0)*0.5+0.5)
 
 

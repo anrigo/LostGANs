@@ -10,6 +10,7 @@ import torch.nn.functional as F
 # import torchvision.transforms as transforms
 from tensorboardX import SummaryWriter
 from torchvision.utils import make_grid
+import json
 
 from utils.util import *
 from data.cocostuff_loader import *
@@ -29,9 +30,12 @@ def get_dataset(dataset, img_size):
                                         stuff_json='./datasets/coco/annotations/stuff_train2017.json',
                                         stuff_only=True, image_size=(img_size, img_size), left_right_flip=True)
     elif dataset == 'vg':
+        with open('./datasets/vg/vocab.json', 'r') as fj:
+            vocab = json.load(fj)
+
         data = VgSceneGraphDataset(vocab=vocab, h5_path='./datasets/vg/train.h5',
-                                      image_dir='./datasets/vg/images/',
-                                      image_size=(img_size, img_size), max_objects=10, left_right_flip=True)
+                                    image_dir='./datasets/vg/images/',
+                                    image_size=(img_size, img_size), max_objects=10, left_right_flip=True)
     return data
 
 
@@ -208,9 +212,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # train on coco
-    args.dataset = 'coco'
-    args.out_path = 'outputs/'
-    args.batch_size = 32
-    args.total_epoch = 200
+    # args.dataset = 'coco'
+    # args.out_path = 'outputs/'
+    # args.batch_size = 32
+    # args.total_epoch = 200
 
-    main(args)
+    # main(args)
