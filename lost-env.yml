@@ -33,6 +33,7 @@ dependencies:
   - charset-normalizer=2.0.12=pyhd8ed1ab_0
   - click=8.1.2=py37h89c1867_0
   - cloudpickle=2.0.0=pyhd8ed1ab_0
+  - colorama=0.4.4=pyh9f0ad1d_0
   - cryptography=36.0.2=py37h38fbfac_1
   - cuda100=1.0=0
   - cycler=0.11.0=pyhd8ed1ab_0
@@ -199,6 +200,7 @@ dependencies:
   - toolz=0.11.2=pyhd8ed1ab_0
   - torchvision=0.2.1=py_2
   - tornado=6.1=py37h540881e_3
+  - tqdm=4.64.0=pyhd8ed1ab_0
   - typing-extensions=4.2.0=hd8ed1ab_0
   - typing_extensions=4.2.0=pyha770c72_0
   - unicodedata2=14.0.0=py37h540881e_1
