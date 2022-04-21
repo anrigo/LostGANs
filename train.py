@@ -23,7 +23,7 @@ from utils.logger import setup_logger
 import wandb
 
 
-def get_dataset(dataset, img_size):
+def get_dataset(dataset, img_size, num_obj=10):
     if dataset == "coco":
         data = CocoSceneGraphDataset(image_dir='./datasets/coco/images/train2017/',
                                         instances_json='./datasets/coco/annotations/instances_train2017.json',
@@ -35,14 +35,14 @@ def get_dataset(dataset, img_size):
 
         data = VgSceneGraphDataset(vocab=vocab, h5_path='./datasets/vg/train.h5',
                                     image_dir='./datasets/vg/images/',
-                                    image_size=(img_size, img_size), max_objects=10, left_right_flip=True)
+                                    image_size=(img_size, img_size), max_objects=num_obj, left_right_flip=True)
     return data
 
 
 def main(args):
 
     wandb.tensorboard.patch(root_logdir=args.out_path)
-    wandb.init(project='lostgan', sync_tensorboard=True)
+    wandb.init(project='lostgan', sync_tensorboard=True, mode='disabled')
 
     # parameters
     img_size = 128
@@ -53,7 +53,7 @@ def main(args):
     num_obj = 8 if args.dataset == 'coco' else 31
 
     # data loader
-    train_data = get_dataset(args.dataset, img_size)
+    train_data = get_dataset(args.dataset, img_size, num_obj-1)
 
     dataloader = torch.utils.data.DataLoader(
         train_data, batch_size=args.batch_size,
@@ -68,7 +68,10 @@ def main(args):
         netG = DataParallelWithCallback(netG)
         netD = nn.DataParallel(netD)
 
+    # learning rates
     g_lr, d_lr = args.g_lr, args.d_lr
+
+    # generator parameters
     gen_parameters = []
     for key, value in dict(netG.named_parameters()).items():
         if value.requires_grad:
@@ -77,12 +80,16 @@ def main(args):
             else:
                 gen_parameters += [{'params': [value], 'lr': g_lr}]
 
+    # generator optimizer
     g_optimizer = torch.optim.Adam(gen_parameters, betas=(0, 0.999))
 
+    # discriminator parameters
     dis_parameters = []
     for key, value in dict(netD.named_parameters()).items():
         if value.requires_grad:
             dis_parameters += [{'params': [value], 'lr': d_lr}]
+    
+    # discriminator optimizer
     d_optimizer = torch.optim.Adam(dis_parameters, betas=(0, 0.999))
 
     # make dirs
@@ -116,7 +123,9 @@ def main(args):
             d_loss_real = torch.nn.ReLU()(1.0 - d_out_real).mean()
             d_loss_robj = torch.nn.ReLU()(1.0 - d_out_robj).mean()
 
+            # z_obj, random latent object appearance
             z = torch.randn(real_images.size(0), num_obj, z_dim).cuda()
+
             fake_images = netG(z, bbox, y=label.squeeze(dim=-1))
             d_out_fake, d_out_fobj = netD(fake_images.detach(), bbox, label)
             d_loss_fake = torch.nn.ReLU()(1.0 + d_out_fake).mean()
@@ -211,10 +220,14 @@ if __name__ == "__main__":
                         help='path to output files')
     args = parser.parse_args()
 
-    # train on coco
+    # train params
+    args.dataset = 'vg'
+    args.out_path = 'outputs/out-vg/'
+    
     # args.dataset = 'coco'
     # args.out_path = 'outputs/'
-    # args.batch_size = 32
-    # args.total_epoch = 200
+    
+    args.batch_size = 32
+    args.total_epoch = 200
 
     main(args)

@@ -43,6 +43,9 @@ class ResnetGenerator128(nn.Module):
         self.init_parameter()
 
     def forward(self, z, bbox, z_im=None, y=None):
+        # z shape: batch, number of objects, latent code length
+
+        # b = batch size, o = number of objects/latents
         b, o = z.size(0), z.size(1)
         label_embedding = self.label_embedding(y)
 
