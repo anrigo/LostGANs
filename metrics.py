@@ -2,6 +2,7 @@ import pathlib
 import numpy as np
 import torch
 from torchmetrics.image.fid import FrechetInceptionDistance
+from torchmetrics.image.inception import InceptionScore
 from PIL import Image
 import torchvision.transforms as TF
 from tqdm import tqdm
@@ -42,7 +43,7 @@ def get_files(path):
 def get_loader(path, batch_size, num_workers):
     files = get_files(path)
 
-    dataset = ImagePathDataset(files)
+    dataset = ImagePathDataset(files, transforms=TF.Resize((299,299))) # resize to 299x299 as in original paper
     dataloader = torch.utils.data.DataLoader(dataset,
                                                 batch_size=batch_size,
                                                 shuffle=False,
@@ -57,11 +58,14 @@ device = torch.device('cuda' if (torch.cuda.is_available()) else 'cpu')
 path_real = 'datasets/coco/images/val2017/'
 path_fake = 'samples/coco128-30/'
 
-batch_size = 1
+batch_size = 50
 num_workers = 10
 
 fid = FrechetInceptionDistance(feature=2048).to(device)
+inception = InceptionScore().to(device)
 
+
+# real images
 dataloader = get_loader(path_real, batch_size, num_workers)
 
 for batch in tqdm(dataloader):
@@ -69,11 +73,15 @@ for batch in tqdm(dataloader):
 
     fid.update(batch, real=True)
 
+
+# fake images
 dataloader = get_loader(path_fake, batch_size, num_workers)
 
 for batch in tqdm(dataloader):
     batch = batch.to(device)
 
     fid.update(batch, real=False)
+    inception.update(batch)
 
-print(fid.compute())
+print(f'FID: {fid.compute()}') # 92.0442 COCO 128 30 eps
+print(f'IS: {inception.compute()[0]}') # 11.9291 COCO 128 30 eps
