@@ -56,7 +56,7 @@ def get_loader(path, batch_size, num_workers):
 device = torch.device('cuda' if (torch.cuda.is_available()) else 'cpu')
 
 path_real = 'datasets/coco/images/val2017/'
-path_fake = 'samples/coco128-30/'
+path_fake = 'samples/coco128-65/'
 
 batch_size = 50
 num_workers = 10
@@ -83,5 +83,10 @@ for batch in tqdm(dataloader):
     fid.update(batch, real=False)
     inception.update(batch)
 
-print(f'FID: {fid.compute()}') # 92.0442 COCO 128 30 eps
-print(f'IS: {inception.compute()[0]}') # 11.9291 COCO 128 30 eps
+# 92.0442 COCO 128 30 eps
+# 85.0714 COCO 128 65 eps
+print(f'FID: {fid.compute()}')
+
+# 11.9291 COCO 128 30 eps
+# 12.4324 COCO 128 65 eps
+print(f'IS: {inception.compute()[0]}')
