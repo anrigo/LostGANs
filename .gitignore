@@ -26,3 +26,5 @@ roi_layers.egg-info/
 .ftpignore
 
 wandb
+
+.idea
