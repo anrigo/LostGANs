@@ -96,30 +96,49 @@ class VgSceneGraphDataset(Dataset):
         obj_idxs_with_rels = set()
         obj_idxs_without_rels = set(range(self.data['objects_per_image'][index].item()))
         for r_idx in range(self.data['relationships_per_image'][index]):
+            
+            # these are indices to use in data['object_names'], not the actual objs labels
             s = self.data['relationship_subjects'][index, r_idx].item()
             o = self.data['relationship_objects'][index, r_idx].item()
+            
             obj_idxs_with_rels.add(s)
             obj_idxs_with_rels.add(o)
             obj_idxs_without_rels.discard(s)
             obj_idxs_without_rels.discard(o)
 
+
         obj_idxs = list(obj_idxs_with_rels)
         obj_idxs_without_rels = list(obj_idxs_without_rels)
+
+        # if there are too many objects (with relationships) randomly sample some of them
         if len(obj_idxs) > self.max_objects - 1:
             obj_idxs = random.sample(obj_idxs, self.max_objects)
+
+        # if there are too few, add come of the orphaned objects (objs without relationships)
         if len(obj_idxs) < self.max_objects - 1 and self.use_orphaned_objects:
             num_to_add = self.max_objects - 1 - len(obj_idxs)
             num_to_add = min(num_to_add, len(obj_idxs_without_rels))
             obj_idxs += random.sample(obj_idxs_without_rels, num_to_add)
+        
+        # number of objs
         O = len(obj_idxs) + 1
 
+        # label tensor
         objs = torch.LongTensor(self.max_objects+1).fill_(-1)
 
+        # bounding boxes
         boxes = torch.FloatTensor([[0, 0, 1, 1]]).repeat(self.max_objects+1, 1)
+
+
+        # maps the object indices to their position in the label tensor
         obj_idx_mapping = {}
+
         for i, obj_idx in enumerate(obj_idxs):
+
+            # get the obj's label and bbox using its index
             objs[i] = self.data['object_names'][index, obj_idx].item()
             x, y, w, h = self.data['object_boxes'][index, obj_idx].tolist()
+
             x0 = float(x) / WW
             y0 = float(y) / HH
             x1 = float(w) / WW
@@ -132,6 +151,8 @@ class VgSceneGraphDataset(Dataset):
         # The last object will be the special __image__ object
         objs[O - 1] = self.vocab['object_name_to_idx']['__image__']
 
+        # pad the labels and bboxes
+        # from the number of objects O to the maximum number of objs
         for i in range(O, self.max_objects+1):
             # objs.append(self.vocab['object_name_to_idx']['__image__'])
             # boxes.append(np.array([-0.6, -0.6, 0.5, 0.5]))
