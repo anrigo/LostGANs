@@ -6,12 +6,18 @@ from transformers import GLPNFeatureExtractor, GLPNForDepthEstimation
 
 data = get_dataset('coco', 128, 'test')
 
-image, label, bbox = data[5000]
+image, label, bbox = data[3000]
 
 
 # load models
-feature_extractor = GLPNFeatureExtractor.from_pretrained("vinvino02/glpn-nyu")
-model = GLPNForDepthEstimation.from_pretrained("vinvino02/glpn-nyu")
+
+# NYU
+# feature_extractor = GLPNFeatureExtractor.from_pretrained("vinvino02/glpn-nyu")
+# model = GLPNForDepthEstimation.from_pretrained("vinvino02/glpn-nyu")
+
+# KITTI
+feature_extractor = GLPNFeatureExtractor.from_pretrained("vinvino02/glpn-kitti")
+model = GLPNForDepthEstimation.from_pretrained("vinvino02/glpn-kitti")
 
 # extract features
 pixel_values = feature_extractor(image, return_tensors="pt").pixel_values
