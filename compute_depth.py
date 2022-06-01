@@ -71,5 +71,5 @@ for index in tqdm(range(len(dataset))):
     # plt.show()
 
     # save depthmap
-    np.save(Path(save_path, str(index) +
+    np.save(Path(save_path, filename +
             ('_flip' if flip else '') + '.npy'), prediction)
