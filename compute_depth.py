@@ -1,4 +1,3 @@
-# %%
 import os
 from pathlib import Path
 import numpy as np
@@ -13,16 +12,15 @@ from transformers import GLPNFeatureExtractor, GLPNForDepthEstimation, DPTFeatur
 ds = 'coco'
 mode = 'val'
 
-data = get_dataset(ds, None, mode)
+dataset = get_dataset(ds, None, mode, return_filenames=True)
 
 save_path = Path('datasets', ds + '-depth', mode)
 
 # create dir structure
 if not save_path.is_dir():
-  os.makedirs(save_path)
+    os.makedirs(save_path)
 
 
-# %%
 # load models
 
 # NYU GLPN
@@ -37,55 +35,41 @@ if not save_path.is_dir():
 feature_extractor = DPTFeatureExtractor.from_pretrained("Intel/dpt-large")
 model = DPTForDepthEstimation.from_pretrained("Intel/dpt-large")
 
-# print(len(data))
-# print(len(data.image_ids))
 
+for index in tqdm(range(len(dataset))):
+    image, _, _, filename, flip = dataset[index]
 
-# %%
-for index in tqdm(range(0, len(data))):
-  image, _, _ = data[index]
+    # extract features
+    pixel_values = feature_extractor(image, return_tensors="pt").pixel_values
 
+    # predict depth
+    with torch.no_grad():
+        outputs = model(pixel_values)
+        predicted_depth = outputs.predicted_depth
 
-  # image_id = data.image_ids[index]
-  # filename = data.image_id_to_filename[image_id]
-  # print(filename)
+    # print(predicted_depth.shape)
 
+    # interpolate to original size
+    prediction = torch.nn.functional.interpolate(
+        predicted_depth.unsqueeze(1),
+        size=image.shape[-2:],
+        mode="bicubic",
+        align_corners=False,
+    )
+    prediction = prediction.squeeze().cpu().numpy()
 
-  # extract features
-  pixel_values = feature_extractor(image, return_tensors="pt").pixel_values
+    # formatted = (prediction * 255 / np.max(prediction)).astype("uint8")
+    # formatted = Image.fromarray(formatted)
 
+    # print(prediction.shape)
 
-  # predict depth
-  with torch.no_grad():
-    outputs = model(pixel_values)
-    predicted_depth = outputs.predicted_depth
+    # visualize
+    # _, axs = plt.subplots(1, 2)
+    # axs[0].imshow(image.permute(1,2,0) *  0.5 + 0.5)
+    # axs[1].imshow(prediction, cmap='gray')
+    # # axs[2].imshow(formatted, cmap='gray')
+    # plt.show()
 
-  print(predicted_depth.shape)
-
-  # interpolate to original size
-  prediction = torch.nn.functional.interpolate(
-                      predicted_depth.unsqueeze(1),
-                      size=image.shape[-2:],
-                      mode="bicubic",
-                      align_corners=False,
-              )
-  prediction = prediction.squeeze().cpu().numpy()
-
-  # formatted = (prediction * 255 / np.max(prediction)).astype("uint8")
-  # formatted = Image.fromarray(formatted)
-
-  # print(prediction.shape)
-
-
-  # visualize
-  _, axs = plt.subplots(1, 2)
-  axs[0].imshow(image.permute(1,2,0) *  0.5 + 0.5)
-  axs[1].imshow(prediction, cmap='gray')
-  # axs[2].imshow(formatted, cmap='gray')
-  plt.show()
-
-
-  # save depthmap
-  # np.save(Path(save_path, str(index) + '.npy'), prediction)
-
-# %%
+    # save depthmap
+    np.save(Path(save_path, str(index) +
+            ('_flip' if flip else '') + '.npy'), prediction)

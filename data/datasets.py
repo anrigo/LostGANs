@@ -3,7 +3,7 @@ from data.cocostuff_loader import CocoSceneGraphDataset
 from data.vg import VgSceneGraphDataset
 
 
-def get_dataset(dataset, img_size, mode=None, num_obj=None):
+def get_dataset(dataset, img_size, mode=None, num_obj=None, return_filenames=False):
 
     num_classes = 184 if dataset == 'coco' else 179
 
@@ -30,7 +30,7 @@ def get_dataset(dataset, img_size, mode=None, num_obj=None):
         data = CocoSceneGraphDataset(image_dir=coco_image_dir,
                                         instances_json=coco_instances_json,
                                         stuff_json=coco_stuff_json,
-                                        stuff_only=True, image_size=(img_size, img_size), left_right_flip=True)
+                                        stuff_only=True, image_size=(img_size, img_size), left_right_flip=True, return_filenames=return_filenames)
     elif dataset == 'vg':
         with open('./datasets/vg/vocab.json', 'r') as fj:
             vocab = json.load(fj)

@@ -18,7 +18,7 @@ class CocoSceneGraphDataset(Dataset):
                  normalize_images=True, max_samples=None,
                  include_relationships=True, min_object_size=0.02,
                  min_objects_per_image=3, max_objects_per_image=8, left_right_flip=False,
-                 include_other=False, instance_whitelist=None, stuff_whitelist=None):
+                 include_other=False, instance_whitelist=None, stuff_whitelist=None, return_filenames=False):
         """
         A PyTorch Dataset for loading Coco and Coco-Stuff annotations and converting
         them to scene graphs on the fly.
@@ -66,6 +66,7 @@ class CocoSceneGraphDataset(Dataset):
         self.include_relationships = include_relationships
         self.left_right_flip = left_right_flip
         self.set_image_size(image_size)
+        self.return_filenames = return_filenames
 
         with open(instances_json, 'r') as f:
             instances_data = json.load(f)
@@ -381,6 +382,10 @@ class CocoSceneGraphDataset(Dataset):
         for i in range(O - 1):
             triples.append([i, in_image, O - 1])
         """
+
+        if self.return_filenames:
+            return image, objs, boxes, filename, flip
+
 
         # triples = torch.LongTensor(triples)
         return image, objs, boxes## , b_map #, None # obj_masks #, obj_masks # , b_map # masks # , triples
