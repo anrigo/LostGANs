@@ -18,7 +18,7 @@ def get_dataset(dataset, img_size, mode=None, num_obj=None):
         coco_stuff_json='./datasets/coco/annotations/stuff_train2017.json'
         vg_h5_path='./datasets/vg/train.h5'
         vg_image_dir='./datasets/vg/images/'
-    elif mode == 'test':
+    elif mode == 'val':
         coco_image_dir='./datasets/coco/images/val2017/'
         coco_instances_json='./datasets/coco/annotations/instances_val2017.json'
         coco_stuff_json='./datasets/coco/annotations/stuff_val2017.json'
