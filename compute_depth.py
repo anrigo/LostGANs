@@ -7,7 +7,7 @@ from transformers import GLPNFeatureExtractor, GLPNForDepthEstimation, DPTFeatur
 from PIL import Image
 
 
-data = get_dataset('coco', 640, 'test')
+data = get_dataset('coco', None, 'test')
 
 
 # %%
@@ -27,7 +27,7 @@ model = DPTForDepthEstimation.from_pretrained("Intel/dpt-large")
 
 
 # %%
-index = 5698
+index = 5000
 image, label, bbox = data[index]
 
 
@@ -68,3 +68,5 @@ axs[0].imshow(image.permute(1,2,0) *  0.5 + 0.5)
 axs[1].imshow(prediction, cmap='gray')
 # axs[2].imshow(formatted, cmap='gray')
 plt.show()
+
+# %%
