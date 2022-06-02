@@ -8,9 +8,11 @@ import matplotlib.pyplot as plt
 from transformers import GLPNFeatureExtractor, GLPNForDepthEstimation, DPTFeatureExtractor, DPTForDepthEstimation
 # from PIL import Image
 
+device = torch.device(
+    "cuda") if torch.cuda.is_available() else torch.device("cpu")
 
 ds = 'coco'
-mode = 'val'
+mode = 'train'
 
 dataset = get_dataset(ds, None, mode, return_filenames=True)
 
@@ -35,12 +37,16 @@ if not save_path.is_dir():
 feature_extractor = DPTFeatureExtractor.from_pretrained("Intel/dpt-large")
 model = DPTForDepthEstimation.from_pretrained("Intel/dpt-large")
 
+model.to(device)
+
 
 for index in tqdm(range(len(dataset))):
     image, _, _, filename, flip = dataset[index]
 
     # extract features
     pixel_values = feature_extractor(image, return_tensors="pt").pixel_values
+    pixel_values.to(device)
+    pixel_values = pixel_values.type(torch.cuda.FloatTensor)
 
     # predict depth
     with torch.no_grad():
