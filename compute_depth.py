@@ -6,12 +6,13 @@ import torch
 from tqdm import tqdm
 from data.datasets import get_dataset
 import matplotlib.pyplot as plt
+from torchvision.utils import draw_bounding_boxes
 
 device = torch.device(
     "cuda") if torch.cuda.is_available() else torch.device("cpu")
 
 
-def depth_estimation(ds, mode, visualize=False, save=True, limit=None):
+def depth_estimation(ds, mode, visualize=True, save=False, limit=None):
     '''
     Use MiDaS Large to estimate depth from each image in the dataset and save
     the depthmaps as .npy files
@@ -72,8 +73,56 @@ def depth_estimation(ds, mode, visualize=False, save=True, limit=None):
                 np.save(Path(save_path, filename + '.npy'), prediction)
 
 
+def normalize(tensor: torch.Tensor, range: 'tuple[float, float]') -> torch.Tensor:
+    '''Normalize tensor to the given range'''
+    min_, max_ = range
+    return min_ + (max_ - min_) * tensor
+
+
+def scale_boxes(boxes: torch.Tensor, shape: 'tuple[int, int]') -> torch.Tensor:
+    '''
+    Scales bounding boxes to match the given image size
+
+    Args:
+        boxes: Tensor of bounding boxes in the (x, y, w, h) format, in the range (0,1)
+        shape: tuple (height, width)
+    Returns:
+        boxes: Tensor of bounding boxes in the (xmin, ymin, xmax, ymax) format, scaled up to the specified shape
+    '''
+    for i, box in enumerate(boxes):
+        x, y, w, h = box
+        hh, ww = shape
+        boxes[i] = torch.tensor(
+            (int(x*ww), int(y*hh), int(x*ww)+int(w*ww), int(y*hh)+int(h*hh)))
+    return boxes
+
+
 if __name__ == "__main__":
     ds = 'coco'
     mode = 'val'
+    limit = 1
 
-    depth_estimation(ds, mode, visualize=True, save=False)
+    # load dataset
+    dataset = get_dataset(ds, None, mode, return_filenames=True)
+
+    if limit is None:
+        limit = len(dataset)
+
+    for index in range(limit):
+        image, objs, boxes, filename, flip = dataset[index]
+        boxes = torch.from_numpy(boxes)
+
+        depthmap = np.load(
+            Path('datasets', ds + '-depth', mode, filename + '.npy'))
+
+        if flip:
+            # flip the depthmap as the image is also flipped
+            depthmap = np.fliplr(depthmap)
+
+        boxes = scale_boxes(boxes, image.shape[-2:])
+
+        display = normalize(image.clone()*0.5+0.5, (0, 255)).type(torch.uint8)
+        display = draw_bounding_boxes(display, boxes)
+
+        plt.imshow(display.permute(1, 2, 0))
+        plt.show()
