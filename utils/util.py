@@ -92,3 +92,54 @@ class VGGLoss(nn.Module):
         for i in range(len(x_vgg)):
             loss += self.weights[i] * self.criterion(x_vgg[i], y_vgg[i].detach())
         return loss
+
+
+def normalize_tensor(tensor: torch.Tensor, range: 'tuple[float, float]') -> torch.Tensor:
+    '''
+    Normalize tensor to the given range
+
+    Args:
+        tensor: data tensor
+        range: tuple (min, max)
+    '''
+    min_, max_ = tensor.min(), tensor.max()
+    newmin, newmax = range
+    num = (tensor - min_) * (newmax - newmin)
+    return (num / (max_ - min_)) + newmin
+
+
+def scale_boxes(boxes: torch.Tensor, shape: 'tuple[int, int]', format: str = None, dtype: torch.dtype = None) -> torch.Tensor:
+    '''
+    Scales bounding boxes to match the given image size
+
+    Args:
+        boxes: Tensor of bounding boxes in the (x, y, w, h) format, in the range (0,1)
+        shape: tuple (height, width)
+        format: 'coordinates' for (xmin, ymin, xmax, ymax) format, default format,
+                'size' for (x, y, w, h) format,
+                'inverse_size' for (y, x, h, w), compatible with torchvision crop utility function
+        dtype: if specified the output tensor will be converted to this type, for example torch.int
+    Returns:
+        boxes: Tensor of bounding boxes in the specified format, scaled up to the specified shape
+    '''
+    bboxes = boxes.clone()
+
+    for i, box in enumerate(bboxes):
+        x, y, w, h = box
+        hh, ww = shape
+
+        if format is None or format == 'coordinates':
+            bboxes[i] = torch.tensor(
+                (int(x*ww), int(y*hh), int(x*ww)+int(w*ww), int(y*hh)+int(h*hh)))
+        elif format == 'size':
+            bboxes[i] = torch.tensor(
+                (int(x*ww), int(y*hh), int(w*ww), int(h*hh)))
+        elif format == 'inverse_size':
+            bboxes[i] = torch.tensor(
+                (int(y*hh), int(x*ww), int(h*hh), int(w*ww)))
+        else:
+            raise ValueError('Unrecognized format')
+        
+        if dtype is not None:
+            bboxes = bboxes.type(dtype)
+    return bboxes

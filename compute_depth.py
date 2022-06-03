@@ -1,3 +1,4 @@
+from operator import itemgetter
 import os
 from pathlib import Path
 import cv2
@@ -6,7 +7,9 @@ import torch
 from tqdm import tqdm
 from data.datasets import get_dataset
 import matplotlib.pyplot as plt
+from utils.util import normalize_tensor, scale_boxes
 from torchvision.utils import draw_bounding_boxes
+from torchvision.transforms.functional import crop
 
 device = torch.device(
     "cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -73,30 +76,6 @@ def depth_estimation(ds, mode, visualize=True, save=False, limit=None):
                 np.save(Path(save_path, filename + '.npy'), prediction)
 
 
-def normalize(tensor: torch.Tensor, range: 'tuple[float, float]') -> torch.Tensor:
-    '''Normalize tensor to the given range'''
-    min_, max_ = range
-    return min_ + (max_ - min_) * tensor
-
-
-def scale_boxes(boxes: torch.Tensor, shape: 'tuple[int, int]') -> torch.Tensor:
-    '''
-    Scales bounding boxes to match the given image size
-
-    Args:
-        boxes: Tensor of bounding boxes in the (x, y, w, h) format, in the range (0,1)
-        shape: tuple (height, width)
-    Returns:
-        boxes: Tensor of bounding boxes in the (xmin, ymin, xmax, ymax) format, scaled up to the specified shape
-    '''
-    for i, box in enumerate(boxes):
-        x, y, w, h = box
-        hh, ww = shape
-        boxes[i] = torch.tensor(
-            (int(x*ww), int(y*hh), int(x*ww)+int(w*ww), int(y*hh)+int(h*hh)))
-    return boxes
-
-
 if __name__ == "__main__":
     ds = 'coco'
     mode = 'val'
@@ -112,17 +91,59 @@ if __name__ == "__main__":
         image, objs, boxes, filename, flip = dataset[index]
         boxes = torch.from_numpy(boxes)
 
-        depthmap = np.load(
-            Path('datasets', ds + '-depth', mode, filename + '.npy'))
+        depthmap = torch.from_numpy(np.load(
+            Path('datasets', ds + '-depth', mode, filename + '.npy')))
 
         if flip:
             # flip the depthmap as the image is also flipped
-            depthmap = np.fliplr(depthmap)
+            depthmap = torch.fliplr(depthmap)
 
-        boxes = scale_boxes(boxes, image.shape[-2:])
+        # scale boxes to image size
+        # boxes with width and height
+        size_boxes = scale_boxes(
+            boxes, image.shape[-2:], 'inverse_size', dtype=torch.int)
+        # boxes with xmax and ymax
+        coord_boxes = scale_boxes(
+            boxes, image.shape[-2:], 'coordinates', dtype=torch.int)
 
-        display = normalize(image.clone()*0.5+0.5, (0, 255)).type(torch.uint8)
-        display = draw_bounding_boxes(display, boxes)
+        # crop the boxes from the depthmap
+        crops = [crop(depthmap, *(box.tolist()))
+                 for box in size_boxes]
 
-        plt.imshow(display.permute(1, 2, 0))
+        # compute mean depth for each crop
+        depths = torch.tensor([crop_.mean() for crop_ in crops])
+
+        # normalize depths
+        depths = normalize_tensor(depths, (0, 1))
+
+        # compose new depthmap for visualization
+        # depths as list of tuples (box index, depth value)
+        boxes_depths = [(i, d) for i, d in enumerate(depths)]
+        # sort tuples by depth value, itemgetter gets the depth (position 1) from each tuple
+        boxes_depths = sorted(boxes_depths, key=itemgetter(1))
+
+        # add bboxes depths to an empty depthmap in depth order
+        depth_layout = torch.zeros(depthmap.shape)
+
+        for i, d in boxes_depths:
+            # create a tensor with every element equal to the bbox depth
+            patch = d.clone().repeat(crops[i].shape)
+            # write the depth values in the depthmap at the position of the bbox
+            x, y, xmax, ymax = coord_boxes[i]
+            depth_layout[..., y:ymax, x:xmax] = patch
+
+        # display all
+        display_img = normalize_tensor(
+            image*0.5+0.5, (0, 255)).type(torch.uint8)
+        display_img = draw_bounding_boxes(display_img, coord_boxes)
+
+        _, axs = plt.subplots(1, 3)
+        axs[0].imshow(display_img.permute(1, 2, 0))
+        axs[1].imshow(depthmap, cmap='gray')
+        axs[2].imshow(depth_layout, cmap='gray')
         plt.show()
+
+        # cr = [crop(normalize_tensor(image*0.5+0.5, (0,255)).type(torch.uint8), *(box.tolist()))
+        #                 for box in size_boxes]
+        # plt.imshow(cr[6].permute(1,2,0))
+        # plt.show()
