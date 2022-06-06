@@ -76,7 +76,7 @@ def depth_estimation(ds, mode, visualize=True, save=False, limit=None):
                 np.save(Path(save_path, filename + '.npy'), prediction)
 
 
-def get_depth(depthmap: torch.Tensor, boxes: torch.Tensor, flip: bool, return_crops: bool = False) -> torch.Tensor:
+def get_depth(depthmap: torch.Tensor, boxes: torch.Tensor, flip: bool) -> torch.Tensor:
     '''
     Computes depth values for each bounding box from the depthmap
     '''
@@ -85,8 +85,8 @@ def get_depth(depthmap: torch.Tensor, boxes: torch.Tensor, flip: bool, return_cr
         # flip the depthmap as the image is also flipped
         depthmap = torch.fliplr(depthmap)
 
-    print(depthmap.shape)
-    print(depthmap.shape[-2:])
+    # exclude dummy objects
+    boxes = boxes[boxes[:, 0] >= 0]
 
     # scale boxes to image size
     # boxes with width and height
@@ -101,15 +101,12 @@ def get_depth(depthmap: torch.Tensor, boxes: torch.Tensor, flip: bool, return_cr
     depths = torch.tensor([crop_.mean() for crop_ in crops])
 
     # normalize depths
-    depth = normalize_tensor(depths, (0, 1))
+    depths = normalize_tensor(depths, (0, 1))
 
-    if return_crops:
-        return depth, crops
-
-    return depth
+    return depths
 
 
-def get_depth_layout(depths: torch.Tensor, crops: torch.Tensor, coord_boxes: torch.Tensor) -> torch.Tensor:
+def get_depth_layout(depths: torch.Tensor, boxes: torch.Tensor) -> torch.Tensor:
     '''
     Puts all bounding boxes depths in depth order in a single tensor to be visualized
     '''
@@ -120,6 +117,19 @@ def get_depth_layout(depths: torch.Tensor, crops: torch.Tensor, coord_boxes: tor
     # sort tuples by depth value, itemgetter gets the depth (position 1) from each tuple
     boxes_depths = sorted(boxes_depths, key=itemgetter(1))
 
+    # scale boxes to image size
+    # boxes with width and height
+    size_boxes = scale_boxes(
+        boxes, depthmap.shape[-2:], 'inverse_size', dtype=torch.int)
+
+    # crop the boxes from the depthmap
+    crops = [crop(depthmap, *(box.tolist()))
+             for box in size_boxes]
+
+    # boxes with xmax and ymax
+    coord_boxes = scale_boxes(
+        boxes, image.shape[-2:], 'coordinates', dtype=torch.int)
+
     # add bboxes depths to an empty depthmap in depth order
     depth_layout = torch.zeros(depthmap.shape)
 
@@ -128,10 +138,6 @@ def get_depth_layout(depths: torch.Tensor, crops: torch.Tensor, coord_boxes: tor
         patch = d.clone().repeat(crops[i].shape)
         # write the depth values in the depthmap at the position of the bbox
         x, y, xmax, ymax = coord_boxes[i]
-
-        print(depth_layout[..., y:ymax, x:xmax].shape)
-        print(patch.shape)
-        print(i)
 
         depth_layout[..., y:ymax, x:xmax] = patch
 
@@ -161,7 +167,8 @@ if __name__ == "__main__":
             depthmap = torch.fliplr(depthmap)
 
         # compute depths from depthmap
-        depths, crops = get_depth(depthmap, boxes, flip, return_crops=True)
+        depths = get_depth(depthmap, boxes, flip)
+        # print(depths)
 
         # scale boxes to image size
         # boxes with xmax and ymax
@@ -169,7 +176,7 @@ if __name__ == "__main__":
             boxes, image.shape[-2:], 'coordinates', dtype=torch.int)
 
         # get depth layout
-        depth_layout = get_depth_layout(depths, crops, coord_boxes)
+        depth_layout = get_depth_layout(depths, boxes)
 
         # display all
         display_img = normalize_tensor(
