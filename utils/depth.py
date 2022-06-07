@@ -5,24 +5,32 @@ import cv2
 import numpy as np
 import torch
 from tqdm import tqdm
-from data.datasets import get_dataset
+# from data.datasets import get_dataset
 import matplotlib.pyplot as plt
 from utils.util import normalize_tensor, scale_boxes
-from torchvision.utils import draw_bounding_boxes
+# from torchvision.utils import draw_bounding_boxes
 from torchvision.transforms.functional import crop
 
 device = torch.device(
     "cuda") if torch.cuda.is_available() else torch.device("cpu")
 
 
-def depth_estimation(ds, mode, visualize=True, save=False, limit=None):
+def depth_estimation(dataset, ds, mode, visualize=True, save=False, limit=None):
     '''
     Use MiDaS Large to estimate depth from each image in the dataset and save
-    the depthmaps as .npy files
+    the depthmaps as .npy files, currently works for coco
+
+    Args:
+        dataset: Dataset object from get_dataset, returning the images' filenames
+        ds: name of the dataset, coco or vg
+        mode: train or val
+        visualize: visualize the resulting depthmaps
+        save: save depthmaps
+        limit: how many images to process 
     '''
 
-    # load dataset
-    dataset = get_dataset(ds, None, mode, return_filenames=True)
+    # # load dataset
+    # dataset = get_dataset(ds, None, mode, return_filenames=True)
 
     save_path = Path('datasets', ds + '-depth', mode)
 
@@ -76,14 +84,10 @@ def depth_estimation(ds, mode, visualize=True, save=False, limit=None):
                 np.save(Path(save_path, filename + '.npy'), prediction)
 
 
-def get_depth(depthmap: torch.Tensor, boxes: torch.Tensor, flip: bool) -> torch.Tensor:
+def get_bboxes_depths(depthmap: torch.Tensor, boxes: torch.Tensor) -> torch.Tensor:
     '''
     Computes depth values for each bounding box from the depthmap
     '''
-
-    if flip:
-        # flip the depthmap as the image is also flipped
-        depthmap = torch.fliplr(depthmap)
 
     # exclude dummy objects
     boxes = boxes[boxes[:, 0] >= 0]
@@ -106,7 +110,7 @@ def get_depth(depthmap: torch.Tensor, boxes: torch.Tensor, flip: bool) -> torch.
     return depths
 
 
-def get_depth_layout(depths: torch.Tensor, boxes: torch.Tensor) -> torch.Tensor:
+def get_depth_layout(depths: torch.Tensor, depthmap: torch.Tensor, boxes: torch.Tensor) -> torch.Tensor:
     '''
     Puts all bounding boxes depths in depth order in a single tensor to be visualized
     '''
@@ -128,7 +132,7 @@ def get_depth_layout(depths: torch.Tensor, boxes: torch.Tensor) -> torch.Tensor:
 
     # boxes with xmax and ymax
     coord_boxes = scale_boxes(
-        boxes, image.shape[-2:], 'coordinates', dtype=torch.int)
+        boxes, depthmap.shape[-2:], 'coordinates', dtype=torch.int)
 
     # add bboxes depths to an empty depthmap in depth order
     depth_layout = torch.zeros(depthmap.shape)
@@ -144,6 +148,7 @@ def get_depth_layout(depths: torch.Tensor, boxes: torch.Tensor) -> torch.Tensor:
     return depth_layout
 
 
+""" 
 if __name__ == "__main__":
     '''Display some depthmaps and corresponding depth layouts'''
 
@@ -167,7 +172,7 @@ if __name__ == "__main__":
             depthmap = torch.fliplr(depthmap)
 
         # compute depths from depthmap
-        depths = get_depth(depthmap, boxes, flip)
+        depths = get_bboxes_depths(depthmap, boxes)
         # print(depths)
 
         # scale boxes to image size
@@ -176,7 +181,7 @@ if __name__ == "__main__":
             boxes, image.shape[-2:], 'coordinates', dtype=torch.int)
 
         # get depth layout
-        depth_layout = get_depth_layout(depths, boxes)
+        depth_layout = get_depth_layout(depths, depthmap, boxes)
 
         # display all
         display_img = normalize_tensor(
@@ -188,3 +193,4 @@ if __name__ == "__main__":
         axs[1].imshow(depthmap, cmap='gray')
         axs[2].imshow(depth_layout, cmap='gray')
         plt.show()
+ """

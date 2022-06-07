@@ -1,4 +1,5 @@
 import json, os, random, math
+from pathlib import Path
 from collections import defaultdict
 
 import torch
@@ -11,6 +12,8 @@ from skimage.transform import resize as imresize
 import pycocotools.mask as mask_utils
 from random import shuffle
 
+from utils.depth import get_bboxes_depths
+
 
 class CocoSceneGraphDataset(Dataset):
     def __init__(self, image_dir, instances_json, stuff_json=None,
@@ -18,7 +21,8 @@ class CocoSceneGraphDataset(Dataset):
                  normalize_images=True, max_samples=None,
                  include_relationships=True, min_object_size=0.02,
                  min_objects_per_image=3, max_objects_per_image=8, left_right_flip=False,
-                 include_other=False, instance_whitelist=None, stuff_whitelist=None, return_filenames=False):
+                 include_other=False, instance_whitelist=None, stuff_whitelist=None, 
+                 return_filenames=False, return_depth=False, depth_dir=None):
         """
         A PyTorch Dataset for loading Coco and Coco-Stuff annotations and converting
         them to scene graphs on the fly.
@@ -67,6 +71,8 @@ class CocoSceneGraphDataset(Dataset):
         self.left_right_flip = left_right_flip
         self.set_image_size(image_size)
         self.return_filenames = return_filenames
+        self.return_depth = return_depth
+        self.depth_dir = depth_dir
 
         with open(instances_json, 'r') as f:
             instances_data = json.load(f)
@@ -382,6 +388,26 @@ class CocoSceneGraphDataset(Dataset):
         for i in range(O - 1):
             triples.append([i, in_image, O - 1])
         """
+
+        
+        if self.return_depth:
+            if self.depth_dir is None:
+                raise ValueError("You asked for depth values but a depthmap directory wasn't specified")
+            
+            # load depthmap
+            depthmap = torch.from_numpy(np.load(Path(self.depth_dir, filename + '.npy')))
+
+            if flip:
+                # flip the depthmap as the image is also flipped
+                depthmap = torch.fliplr(depthmap)
+            
+            depths = get_bboxes_depths(depthmap, torch.from_numpy(boxes))
+
+            if self.return_filenames:
+                return image, objs, boxes, depths, filename, flip
+
+            return image, objs, boxes, depths
+
 
         if self.return_filenames:
             return image, objs, boxes, filename, flip
