@@ -42,7 +42,7 @@ def get_dataset(dataset, img_size, num_obj=10):
 def main(args):
 
     wandb.tensorboard.patch(root_logdir=args.out_path)
-    wandb.init(project='lostgan', sync_tensorboard=True)
+    wandb.init(project='lostgan', sync_tensorboard=True, mode='disabled')
 
     # parameters
     img_size = 128

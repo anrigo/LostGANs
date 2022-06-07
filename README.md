@@ -1,7 +1,14 @@
 # Setup
 Conda env
 ```
+# New environment compatible with pytorch 1.10.1
+conda env create -f lost2-env.yml
+
+# Old environment with pytorch 1.0 (not needed anymore)
 conda env create -f lost-env.yml
+
+# Separate environment for torchmetrics (to be merged probably)
+conda env create -f metrics-env.yml
 ```
 
 Install g++ and cuda toolkit (nvcc), for Debian-based systems
