@@ -98,5 +98,7 @@ class MaskRegressNetv2(nn.Module):
         x = self.conv3(x)
         x = x.view(b, num_o, 16, 16)
 
+        # transform the predicted 16x16 masks
+        # to the resblock feature map size
         bbmap = masks_to_layout(bbox, x, self.map_size).view(b, num_o, self.map_size, self.map_size)
         return bbmap

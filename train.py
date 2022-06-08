@@ -221,13 +221,13 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # train params
-    args.dataset = 'vg'
-    args.out_path = 'outputs/out-vg/'
+    # args.dataset = 'vg'
+    # args.out_path = 'outputs/out-vg/'
     
-    # args.dataset = 'coco'
-    # args.out_path = 'outputs/'
+    args.dataset = 'coco'
+    args.out_path = 'outputs/'
     
-    args.batch_size = 32
+    args.batch_size = 10
     args.total_epoch = 200
 
     main(args)

@@ -55,25 +55,49 @@ class ResnetGenerator128(nn.Module):
         latent_vector = torch.cat((z, label_embedding), dim=1).view(b, o, -1)
 
         w = self.mapping(latent_vector.view(b * o, -1))
+        
         # preprocess bbox
+        # predict a 64x64 mask for each object in each image
+        # each mask has 0 outside of the corresponding bounding box
+        # M_s in the paper
+        # (batch, num_o, 64, 64)
         bmask = self.mask_regress(w, bbox)
 
         if z_im is None:
             z_im = torch.randn((b, 128), device=z.device)
 
+        # 64x64 binary mask for each bounding box
+        # 1 inside bbox, 0 outside
+        # used to clip the mask obtained from
+        # each resblock output features
+        # (batch, num_o, 64, 64)
         bbox_mask_ = bbox_mask(z, bbox, 64, 64)
 
         # 4x4
+        # (batch, 1024, 4, 4)
         x = self.fc(z_im).view(b, -1, 4, 4)
         # 8x8
+        # each resblock returns a mask using
+        # a small convolutional network on it's own output features
+        # (batch, 1024, 8, 8), (batch, 184, 8, 8)
         x, stage_mask = self.res1(x, w, bmask)
 
         # 16x16
         hh, ww = x.size(2), x.size(3)
+        # from stage_mask (batch, 184, h, w) get only 31 masks
+        # resulting in (batch, num_o, h, w), a mask for each obj
+        # (batch, num_o, 8, 8)
         seman_bbox = batched_index_select(stage_mask, dim=1, index=y.view(b, o, 1, 1)) # size (b, num_o, h, w)
+        # clip the masks so that everything outside the corresponding
+        # bounding box is set to 0
+        # M_f in the paper
+        # (batch, num_o, 8, 8)
         seman_bbox = torch.sigmoid(seman_bbox) * F.interpolate(bbox_mask_, size=(hh, ww), mode='nearest')
-        alpha1 = torch.gather(self.sigmoid(self.alpha1).expand(b, -1, -1), dim=1, index=y.view(b, o, 1)).unsqueeze(-1) 
+        
+        alpha1 = torch.gather(self.sigmoid(self.alpha1).expand(b, -1, -1), dim=1, index=y.view(b, o, 1)).unsqueeze(-1)
+        # (batch, num_o, 8, 8)
         stage_bbox = F.interpolate(bmask, size=(hh, ww), mode='bilinear') * (1 - alpha1) + seman_bbox * alpha1
+        # (batch, 512, 16, 16), (batch, 184, 16, 16)
         x, stage_mask = self.res2(x, w, stage_bbox)
 
         # 32x32
@@ -277,6 +301,10 @@ class ResBlock(nn.Module):
 
     def forward(self, in_feat, w, bbox):
         out_feat = self.residual(in_feat, w, bbox) + self.shortcut(in_feat)
+        
+        # ToMask operation in the paper
+        # + sigmoid later in the generator's forward
+        # learns a mask from the output features of the resblock
         if self.predict_mask:
             mask = self.conv_mask(out_feat)
         else:
@@ -293,10 +321,19 @@ def conv2d(in_feat, out_feat, kernel_size=3, stride=1, pad=1, spectral_norm=True
 
 
 def batched_index_select(input, dim, index):
+    # list of stage mask dims
+    # [batch, 184, h, w]
     expanse = list(input.shape)
+    # dims marked with -1 will be ignored by torch expand
+    # ignore batch and the specified dim (1)
     expanse[0] = -1
     expanse[dim] = -1
+    # expand labels from (batch, num_o, 1, 1)
+    # to (batch, num_o, h, w) repeating values
     index = index.expand(expanse)
+    # gets from input all elements specified by index
+    # along dim (1) dimension
+    # in this case from 184 it will take only num_o hxw tensors
     return torch.gather(input, dim, index)
 
 
