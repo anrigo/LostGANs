@@ -76,6 +76,7 @@ class ResnetGenerator128(nn.Module):
         # 4x4
         # (batch, 1024, 4, 4)
         x = self.fc(z_im).view(b, -1, 4, 4)
+
         # 8x8
         # each resblock returns a mask using
         # a small convolutional network on it's own output features
@@ -84,19 +85,36 @@ class ResnetGenerator128(nn.Module):
 
         # 16x16
         hh, ww = x.size(2), x.size(3)
+
         # from stage_mask (batch, 184, h, w) get only 31 masks
         # resulting in (batch, num_o, h, w), a mask for each obj
         # (batch, num_o, 8, 8)
         seman_bbox = batched_index_select(stage_mask, dim=1, index=y.view(b, o, 1, 1)) # size (b, num_o, h, w)
+
         # clip the masks so that everything outside the corresponding
         # bounding box is set to 0
         # M_f in the paper
         # (batch, num_o, 8, 8)
         seman_bbox = torch.sigmoid(seman_bbox) * F.interpolate(bbox_mask_, size=(hh, ww), mode='nearest')
         
+        # 184 is the max number of possible classes
+        # alpha learnable weight to balance the two masks
+        # expand alpha from (1, 184, 1) to (batch, 184, 1)
+        # reshape labels y from (batch, num_o) to (batch, num_o, 1) to match alpha
+        # from the 184 alphas extract the relevant num_o ones, one alpha for each label
+        # unsqueeze alpha to append a dimension at the end
+        # (batch, num_o, 1, 1)
         alpha1 = torch.gather(self.sigmoid(self.alpha1).expand(b, -1, -1), dim=1, index=y.view(b, o, 1)).unsqueeze(-1)
+
+        # bmask: masks predicted by regressor from the bbox
+        # seman_bbox: masks predicted by the convolutional ToMask operation
+        #             in the ResBlock, using the output features of the block itself
+        #             clipped based on the layout, 0 outside of the bboxes
+        # combine the two masks using learnable alpha as weight
+        # M_s [bmask] * (1 - alpha) + M_f [seman_bbox] * alpha
         # (batch, num_o, 8, 8)
         stage_bbox = F.interpolate(bmask, size=(hh, ww), mode='bilinear') * (1 - alpha1) + seman_bbox * alpha1
+
         # (batch, 512, 16, 16), (batch, 184, 16, 16)
         x, stage_mask = self.res2(x, w, stage_bbox)
 
@@ -300,6 +318,11 @@ class ResBlock(nn.Module):
         return x
 
     def forward(self, in_feat, w, bbox):
+        # bbox is the resulting mask from the previous stage
+        # the combination of the mask predicred by the mask regressor
+        # and the clipped mask predicted by the previous ResBlock+ conv ToMask
+        # not the bboxes coordinates
+
         out_feat = self.residual(in_feat, w, bbox) + self.shortcut(in_feat)
         
         # ToMask operation in the paper
