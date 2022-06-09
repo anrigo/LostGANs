@@ -318,7 +318,7 @@ class ResBlock(nn.Module):
         return x
 
     def forward(self, in_feat, w, bbox):
-        # bbox is the resulting mask from the previous stage
+        # bbox is the resulting mask from the previous stage, M
         # the combination of the mask predicred by the mask regressor
         # and the clipped mask predicted by the previous ResBlock+ conv ToMask
         # not the bboxes coordinates

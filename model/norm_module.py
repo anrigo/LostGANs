@@ -167,22 +167,46 @@ class SpatialAdaptiveSynBatchNorm2d(nn.Module):
         :param bbox: bbox map (b, o, h, w)
         :return:
         """
-        # self._check_input_dim(x)
+
+        # bbox is the resulting mask from the previous stage, M
+        # the combination of the mask predicred by the mask regressor
+        # and the clipped mask predicted by the previous ResBlock+ conv ToMask
+        # not the bboxes coordinates
+
+        # standard batch norm synchronized across devices to normalize features
         output = self.batch_norm2d(x)
 
         b, o, bh, bw = bbox.size()
         _, _, h, w = x.size()
+
+        # adapt the mask to have the same size as the input features
         if bh != h or bw != w:
             bbox = F.interpolate(bbox, size=(h, w), mode='bilinear')
-        # calculate weight and bias
+        
+        # projection matrices learned from the label + style vector, A in the paper
+        # calculate weight and bias, transformation parameters, Tau in the paper
         weight, bias = self.weight_proj(vector), self.bias_proj(vector)
 
+        # resize weight and bias
+        # (batch, num_o, num_features), (batch, num_o, num_features)
         weight, bias = weight.view(b, o, -1), bias.view(b, o, -1)
 
+        # equation 8
+        # M = bbox, weight = gamma (in Tau)
+        # bbox.unsqueeze(2) * weight.unsqueeze(-1).unsqueeze(-1) has dim (batch, num_o, num_features, h, w)
+        # sum over the objects, deleting the dimension afterwards
+        # (batch, num_features, h, w)
         weight = torch.sum(bbox.unsqueeze(2) * weight.unsqueeze(-1).unsqueeze(-1), dim=1, keepdim=False) / \
                  (torch.sum(bbox.unsqueeze(2), dim=1, keepdim=False) + 1e-6) + 1
+        # equation 9
+        # M = bbox, bias = beta (in Tau)
+        # bbox.unsqueeze(2) * bias.unsqueeze(-1).unsqueeze(-1) has dim (batch, num_o, num_features, h, w)
+        # sum over the objects, deleting the dimension afterwards
+        # (batch, num_features, h, w)
         bias = torch.sum(bbox.unsqueeze(2) * bias.unsqueeze(-1).unsqueeze(-1), dim=1, keepdim=False) / \
                (torch.sum(bbox.unsqueeze(2), dim=1, keepdim=False) + 1e-6)
+        
+        # transform the features
         return weight * output + bias
 
     def __repr__(self):
