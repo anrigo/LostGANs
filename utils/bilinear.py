@@ -149,10 +149,16 @@ def masks_to_layout(boxes, masks, H, W=None):
     assert masks.size() == (b, num_o, M, M)
     if W is None:
         W = H
-
+    
+    # batch*num_o = total number of masks
+    # (batch*num_o, H, W, 2), where the last dimension are mask pixel coordinates x, y
     grid = _boxes_to_grid(boxes.view(b*num_o, -1), H, W).float().cuda(device=masks.device)
-
+    
+    # resize masks to (batch*num_o, 1, M, M)
     img_in = masks.float().view(b*num_o, 1, M, M)
+
+    # interpolate img_in (masks) pixels specified by grid last dimension
+    # (batch*num_o, 1, H, W)
     sampled = F.grid_sample(img_in, grid, mode='bilinear')
 
     return sampled.view(b, num_o, H, W)

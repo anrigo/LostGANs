@@ -88,6 +88,10 @@ class MaskRegressNetv2(nn.Module):
         :param bbox: (b, num_o, 4)
         :return: bbmap: (b, num_o, map_size, map_size)
         """
+
+        # obj_feat: latent style + labels vector
+        # bbox: coordinates
+
         b, num_o, _ = bbox.size()
         obj_feat = obj_feat.view(b * num_o, -1)
         x = self.fc(obj_feat)
@@ -98,7 +102,9 @@ class MaskRegressNetv2(nn.Module):
         x = self.conv3(x)
         x = x.view(b, num_o, 16, 16)
 
-        # transform the predicted 16x16 masks
+        # interpolate the predicted 16x16 masks
         # to the resblock feature map size
+        # (batch, num_o, map_size, map_size)
         bbmap = masks_to_layout(bbox, x, self.map_size).view(b, num_o, self.map_size, self.map_size)
+
         return bbmap
