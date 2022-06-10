@@ -12,8 +12,6 @@ def get_dataset(dataset, img_size, mode=None, depth_dir=None, num_obj=None, retu
         depth_dir = Path('datasets', dataset + '-depth', mode)
 
     if num_obj is None:
-        num_obj = 10
-    else:
         num_obj = 8 if dataset == 'coco' else 31
 
     if mode is None or mode == 'train':
