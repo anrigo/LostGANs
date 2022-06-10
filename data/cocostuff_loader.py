@@ -391,8 +391,8 @@ class CocoSceneGraphDataset(Dataset):
 
         
         if self.return_depth:
-            if self.depth_dir is None:
-                raise ValueError("You asked for depth values but a depthmap directory wasn't specified")
+            if not Path(self.depth_dir).is_dir:
+                raise FileNotFoundError("Coudn't find the depth folder")
             
             # load depthmap
             depthmap = torch.from_numpy(np.load(Path(self.depth_dir, filename + '.npy')))
