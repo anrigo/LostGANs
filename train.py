@@ -10,7 +10,6 @@ import torch.nn.functional as F
 # import torchvision.transforms as transforms
 from tensorboardX import SummaryWriter
 from torchvision.utils import make_grid
-import json
 
 from utils.util import *
 from data.cocostuff_loader import *
@@ -19,24 +18,25 @@ from model.resnet_generator_v2 import *
 from model.rcnn_discriminator import *
 from model.sync_batchnorm import DataParallelWithCallback
 from utils.logger import setup_logger
+from data.datasets import get_dataset
 
 import wandb
 
 
-def get_dataset(dataset, img_size, num_obj=10):
-    if dataset == "coco":
-        data = CocoSceneGraphDataset(image_dir='./datasets/coco/images/train2017/',
-                                        instances_json='./datasets/coco/annotations/instances_train2017.json',
-                                        stuff_json='./datasets/coco/annotations/stuff_train2017.json',
-                                        stuff_only=True, image_size=(img_size, img_size), left_right_flip=True)
-    elif dataset == 'vg':
-        with open('./datasets/vg/vocab.json', 'r') as fj:
-            vocab = json.load(fj)
+# def get_dataset(dataset, img_size, num_obj=10):
+#     if dataset == "coco":
+#         data = CocoSceneGraphDataset(image_dir='./datasets/coco/images/train2017/',
+#                                         instances_json='./datasets/coco/annotations/instances_train2017.json',
+#                                         stuff_json='./datasets/coco/annotations/stuff_train2017.json',
+#                                         stuff_only=True, image_size=(img_size, img_size), left_right_flip=True)
+#     elif dataset == 'vg':
+#         with open('./datasets/vg/vocab.json', 'r') as fj:
+#             vocab = json.load(fj)
 
-        data = VgSceneGraphDataset(vocab=vocab, h5_path='./datasets/vg/train.h5',
-                                    image_dir='./datasets/vg/images/',
-                                    image_size=(img_size, img_size), max_objects=num_obj, left_right_flip=True)
-    return data
+#         data = VgSceneGraphDataset(vocab=vocab, h5_path='./datasets/vg/train.h5',
+#                                     image_dir='./datasets/vg/images/',
+#                                     image_size=(img_size, img_size), max_objects=num_obj, left_right_flip=True)
+#     return data
 
 
 def main(args):
@@ -53,7 +53,7 @@ def main(args):
     num_obj = 8 if args.dataset == 'coco' else 31
 
     # data loader
-    train_data = get_dataset(args.dataset, img_size, num_obj-1)
+    train_data = get_dataset(args.dataset, img_size, mode='train', return_depth=True)
 
     dataloader = torch.utils.data.DataLoader(
         train_data, batch_size=args.batch_size,
@@ -113,8 +113,8 @@ def main(args):
         netD.train()
 
         for idx, data in enumerate(dataloader):
-            real_images, label, bbox = data
-            real_images, label, bbox = real_images.cuda(), label.long().cuda().unsqueeze(-1), bbox.float()
+            real_images, label, bbox, depths = data
+            real_images, label, bbox, depths = real_images.cuda(), label.long().cuda().unsqueeze(-1), bbox.float(), depths.cuda()
 
             # update D network
             netD.zero_grad()
@@ -226,7 +226,7 @@ if __name__ == "__main__":
     
     args.dataset = 'coco'
     args.out_path = 'outputs/'
-    
+
     args.batch_size = 10
     args.total_epoch = 200
 

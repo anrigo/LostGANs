@@ -1,10 +1,11 @@
 import json
 from pathlib import Path
+from typing import Union
 from data.cocostuff_loader import CocoSceneGraphDataset
 from data.vg import VgSceneGraphDataset
 
 
-def get_dataset(dataset, img_size, mode=None, depth_dir=None, num_obj=None, return_filenames=False, return_depth=False):
+def get_dataset(dataset: str, img_size: int, mode: str = None, depth_dir: Union[str, Path] = None, num_obj: int = None, return_filenames: bool = False, return_depth: bool = False):
 
     num_classes = 184 if dataset == 'coco' else 179
 
@@ -26,6 +27,9 @@ def get_dataset(dataset, img_size, mode=None, depth_dir=None, num_obj=None, retu
         coco_stuff_json = './datasets/coco/annotations/stuff_val2017.json'
         vg_h5_path = './datasets/vg/val.h5'
         vg_image_dir = './datasets/vg/images/'
+
+    if depth_dir is None:
+        depth_dir = Path('datasets', f'{dataset}-depth', mode)
 
     if dataset == "coco":
         data = CocoSceneGraphDataset(image_dir=coco_image_dir,

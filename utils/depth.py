@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 from utils.util import normalize_tensor, scale_boxes
 # from torchvision.utils import draw_bounding_boxes
 from torchvision.transforms.functional import crop
+from torch.nn.functional import pad
 
 device = torch.device(
     "cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -89,6 +90,9 @@ def get_bboxes_depths(depthmap: torch.Tensor, boxes: torch.Tensor) -> torch.Tens
     Computes depth values for each bounding box from the depthmap
     '''
 
+    # save number of boxes
+    num_o = boxes.shape[0]
+
     # exclude dummy objects
     boxes = boxes[boxes[:, 0] >= 0]
 
@@ -106,6 +110,9 @@ def get_bboxes_depths(depthmap: torch.Tensor, boxes: torch.Tensor) -> torch.Tens
 
     # normalize depths
     depths = normalize_tensor(depths, (0, 1))
+
+    # set -0.5 depth to dummy objects
+    depths = pad(depths, (0, num_o-depths.shape[0]), value=-0.5)
 
     return depths
 
