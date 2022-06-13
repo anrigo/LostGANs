@@ -124,7 +124,7 @@ def get_depth_layout(depths: torch.Tensor, depthmap: torch.Tensor, boxes: torch.
 
     # compose new depthmap for visualization
     # depths as list of tuples (box index, depth value)
-    boxes_depths = [(i, d) for i, d in enumerate(depths)]
+    boxes_depths = [(i, d) for i, d in enumerate(depths[depths > 0])]
     # sort tuples by depth value, itemgetter gets the depth (position 1) from each tuple
     boxes_depths = sorted(boxes_depths, key=itemgetter(1))
 
