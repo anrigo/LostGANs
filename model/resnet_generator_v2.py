@@ -15,7 +15,8 @@ class ResnetGenerator128(nn.Module):
 
         self.label_embedding = nn.Embedding(num_classes, 180)
 
-        num_w = 128+180
+        # style + label embedding + depth
+        num_w = 128+180+1
         self.fc = nn.utils.spectral_norm(nn.Linear(z_dim, 4*4*16*ch))
 
         self.res1 = ResBlock(ch*16, ch*16, upsample=True, num_w=num_w)
@@ -42,7 +43,7 @@ class ResnetGenerator128(nn.Module):
         self.mask_regress = MaskRegressNetv2(num_w)
         self.init_parameter()
 
-    def forward(self, z, bbox, z_im=None, y=None):
+    def forward(self, z, bbox, y, depths, z_im=None):
         # z shape: batch, number of objects, latent code length
 
         # b = batch size, o = number of objects/latents
@@ -55,6 +56,9 @@ class ResnetGenerator128(nn.Module):
         latent_vector = torch.cat((z, label_embedding), dim=1).view(b, o, -1)
 
         w = self.mapping(latent_vector.view(b * o, -1))
+
+        # latent vector style + labels + depth
+        w = torch.cat((w, depths.view(b * o, -1)), dim=1).view(b, o, -1)
         
         # preprocess bbox
         # predict a 64x64 mask for each object in each image

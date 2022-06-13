@@ -126,7 +126,7 @@ def main(args):
             # z_obj, random latent object appearance
             z = torch.randn(real_images.size(0), num_obj, z_dim).cuda()
 
-            fake_images = netG(z, bbox, y=label.squeeze(dim=-1))
+            fake_images = netG(z, bbox, y=label.squeeze(dim=-1), depths=depths)
             d_out_fake, d_out_fobj = netD(fake_images.detach(), bbox, label)
             d_loss_fake = torch.nn.ReLU()(1.0 + d_out_fake).mean()
             d_loss_fobj = torch.nn.ReLU()(1.0 + d_out_fobj).mean()
