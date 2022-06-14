@@ -9,5 +9,5 @@ PATH=$PATH:/usr/local/cuda-10.2/bin/
 # check that you can access nvcc
 nvcc --version
 
-/home/arigo/miniforge3/envs/lost/bin/python setup.py build develop
+/home/arigo/miniforge3/envs/lost2/bin/python setup.py build develop
 
