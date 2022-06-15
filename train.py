@@ -66,7 +66,7 @@ def main(args):
         drop_last=True, shuffle=True, num_workers=8)
 
     # Load model
-    netG = ResnetGenerator128(num_classes=num_classes, output_dim=3).cuda()
+    netG = ResnetGeneratorDepth128(num_classes=num_classes, output_dim=3).cuda()
     netD = CombineDiscriminator128(num_classes=num_classes).cuda()
 
     parallel = True
