@@ -42,7 +42,7 @@ class ResnetGenerator128(nn.Module):
         self.mask_regress = MaskRegressNetv2(num_w)
         self.init_parameter()
 
-    def forward(self, z, bbox, z_im=None, y=None):
+    def forward(self, z, bbox, z_im=None, y=None) -> torch.Tensor:
         # z shape: batch, number of objects, latent code length
 
         # b = batch size, o = number of objects/latents
@@ -189,7 +189,7 @@ class ResnetGeneratorDepth128(nn.Module):
         self.mask_regress = MaskRegressNetv2(num_w)
         self.init_parameter()
 
-    def forward(self, z, bbox, y, depths, z_im=None):
+    def forward(self, z, bbox, y, depths, z_im=None) -> torch.Tensor:
         # z shape: batch, number of objects, latent code length
 
         # b = batch size, o = number of objects/latents
