@@ -19,9 +19,6 @@ from model.rcnn_discriminator import *
 from model.sync_batchnorm import DataParallelWithCallback
 from utils.logger import setup_logger
 from data.datasets import get_dataset
-from torchvision.utils import draw_bounding_boxes
-from torchvision.transforms import Resize
-import utils.depth as udpt
 
 import wandb
 
@@ -45,7 +42,7 @@ import wandb
 def main(args):
 
     wandb.tensorboard.patch(root_logdir=args.out_path)
-    wandb.init(project='lostgan-depth', sync_tensorboard=True)
+    wandb.init(project='lostgan', sync_tensorboard=True, mode='disabled')
 
     # parameters
     img_size = 128
@@ -55,18 +52,15 @@ def main(args):
     num_classes = 184 if args.dataset == 'coco' else 179
     num_obj = 8 if args.dataset == 'coco' else 31
 
-    disp_depth = 6
-    disp_depth = disp_depth if disp_depth < args.batch_size else args.batch_size
-
     # data loader
-    train_data = get_dataset(args.dataset, img_size, mode='train', return_depth=True, return_filenames=True)
+    train_data = get_dataset(args.dataset, img_size, mode='train')
 
     dataloader = torch.utils.data.DataLoader(
         train_data, batch_size=args.batch_size,
         drop_last=True, shuffle=True, num_workers=8)
 
     # Load model
-    netG = ResnetGeneratorDepth128(num_classes=num_classes, output_dim=3).cuda()
+    netG = ResnetGenerator128(num_classes=num_classes, output_dim=3).cuda()
     netD = CombineDiscriminator128(num_classes=num_classes).cuda()
 
     parallel = True
@@ -119,8 +113,8 @@ def main(args):
         netD.train()
 
         for idx, data in enumerate(dataloader):
-            real_images, label, bbox, depths, filenames, flips = data
-            real_images, label, bbox, depths = real_images.cuda(), label.long().cuda().unsqueeze(-1), bbox.float(), depths.cuda()
+            real_images, label, bbox = data
+            real_images, label, bbox = real_images.cuda(), label.long().cuda().unsqueeze(-1), bbox.float()
 
             # update D network
             netD.zero_grad()
@@ -132,7 +126,7 @@ def main(args):
             # z_obj, random latent object appearance
             z = torch.randn(real_images.size(0), num_obj, z_dim).cuda()
 
-            fake_images = netG(z, bbox, y=label.squeeze(dim=-1), depths=depths)
+            fake_images = netG(z, bbox, y=label.squeeze(dim=-1))
             d_out_fake, d_out_fobj = netD(fake_images.detach(), bbox, label)
             d_loss_fake = torch.nn.ReLU()(1.0 + d_out_fake).mean()
             d_loss_fobj = torch.nn.ReLU()(1.0 + d_out_fobj).mean()
@@ -194,52 +188,13 @@ def main(args):
                                                                                                         g_loss_obj.item()))
                 logger.info("             pixel_loss: {:.4f}, feat_loss: {:.4f}".format(pixel_loss.item(), feat_loss.item()))
 
-                # put images in a grid tensor
-                # * 0.5 + 0.5 normalizes images to [0,1]
-                real_grid = make_grid(real_images.cpu().data * 0.5 + 0.5, nrow=4)
-                fake_grid = make_grid(fake_images.cpu().data * 0.5 + 0.5, nrow=4)
 
-                depth_results = []
-                resize_ = Resize(train_data.image_size)
-
-                # visualize the first disp_depth images and their depth layouts
-                for jdx in range(disp_depth):
-                    coord_box = scale_boxes(
-                        bbox[jdx], train_data.image_size, 'coordinates', dtype=torch.int)
-                    
-                    # draw boxes
-                    ann_img = normalize_tensor(real_images[jdx].cpu()*0.5+0.5, (0, 255)).type(torch.uint8)
-                    ann_img = draw_bounding_boxes(ann_img, coord_box)
-
-                    # load depthmap
-                    depthmap = torch.from_numpy(np.load(Path(train_data.depth_dir, filenames[jdx] + '.npy')))
-                    depthmap = resize_(depthmap.unsqueeze(0))
-                    # depthmap = depthmap.squeeze()
-
-                    if flips[jdx]:
-                        # flip the depthmap as the image is also flipped
-                        depthmap = torch.fliplr(depthmap)
-
-                    # get depth layout
-                    depth_layout = udpt.get_depth_layout(depths[jdx], depthmap, bbox[jdx])
-
-                    depth_results.extend([
-                        # normalize everything to [0,1]
-                        normalize_tensor(ann_img.type(torch.float32), (0,1)),
-                        torch.cat((depth_layout, depth_layout, depth_layout), 0).cpu(), # already in [0,1]
-                        (fake_images[jdx]*0.5+0.5).cpu()
-                        ])
-                
-                depth_grid = make_grid(depth_results, nrow=3)
-
-                writer.add_image("real images", real_grid, epoch*len(dataloader) + idx + 1)
-                writer.add_image("fake images", fake_grid, epoch*len(dataloader) + idx + 1)
-                writer.add_image("depth results", depth_grid, epoch*len(dataloader) + idx + 1)
+                writer.add_image("real images", make_grid(real_images.cpu().data * 0.5 + 0.5, nrow=4), epoch*len(dataloader) + idx + 1)
+                writer.add_image("fake images", make_grid(fake_images.cpu().data * 0.5 + 0.5, nrow=4), epoch*len(dataloader) + idx + 1)
 
                 wandb.log({
-                    "real_images": wandb.Image(real_grid),
-                    "fake_images": wandb.Image(fake_grid),
-                    "depth_results": wandb.Image(depth_grid)
+                    "real_images": wandb.Image(make_grid(real_images.cpu().data * 0.5 + 0.5, nrow=4)),
+                    "fake_images": wandb.Image(make_grid(fake_images.cpu().data * 0.5 + 0.5, nrow=4))
                 })
 
         # save model
@@ -263,8 +218,6 @@ if __name__ == "__main__":
                         help='learning rate for generator')
     parser.add_argument('--out_path', type=str, default='./outputs/',
                         help='path to output files')
-    parser.add_argument('--depth_path', type=str, default='',
-                        help='path to depthmaps')
     args = parser.parse_args()
 
     # train params
@@ -272,8 +225,7 @@ if __name__ == "__main__":
     # args.out_path = 'outputs/out-vg/'
     
     args.dataset = 'coco'
-    args.out_path = 'outputs/coco-depth/'
-    args.depth_dir = Path('datasets', f'{args.dataset}-depth', 'train')
+    args.out_path = 'outputs/coco2/'
 
     args.batch_size = 32
     args.total_epoch = 200
