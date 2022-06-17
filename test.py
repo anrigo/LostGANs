@@ -1,12 +1,8 @@
 import argparse
 from collections import OrderedDict
-from matplotlib import pyplot as plt
-import numpy as np
 # from scipy import misc
 from imageio import imsave
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 from tqdm import tqdm
 from data.cocostuff_loader import *
 from data.vg import *
