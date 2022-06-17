@@ -1,23 +1,20 @@
 # Setup
 Conda env
-```
-# New environment compatible with pytorch 1.10.1
+```bash
+# New environment with pytorch 1.10.1
 conda env create -f lost2-env.yml
 
 # Old environment with pytorch 1.0 (not needed anymore)
 conda env create -f lost-env.yml
-
-# Separate environment for torchmetrics (to be merged probably)
-conda env create -f metrics-env.yml
 ```
 
 Install g++ and cuda toolkit (nvcc), for Debian-based systems
-```
+```bash
 apt install g++ build-essential nvidia-cuda-toolkit
 ```
 
 Only needed if you have to run the project on the IvI cluster:
-```
+```bash
 # change gcc to a version compatible with pytorch
 source /opt/rh/devtoolset-8/enable
 
@@ -29,17 +26,17 @@ nvcc --version
 ```
 
 Setup roi_layers
-```
+```bash
 python setup.py build develop
 ```
 ## Data Preparation
 
 Download COCO dataset to `datasets/coco`
-```
+```bash
 bash scripts/download_coco.sh
 ```
 Download VG dataset to `datasets/vg`
-```
+```bash
 bash scripts/download_vg.sh
 python scripts/preprocess_vg.py
 ```
