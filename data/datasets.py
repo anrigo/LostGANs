@@ -1,8 +1,15 @@
 import json
 from pathlib import Path
 from typing import Union
+
+import numpy as np
 from data.cocostuff_loader import CocoSceneGraphDataset
 from data.vg import VgSceneGraphDataset
+import torch
+from PIL import Image
+
+IMAGE_EXTENSIONS = {'bmp', 'jpg', 'jpeg', 'pgm', 'png', 'ppm',
+                    'tif', 'tiff', 'webp'}
 
 
 def get_dataset(dataset: str, img_size: int, mode: str = None, depth_dir: Union[str, Path] = None, num_obj: int = None, return_filenames: bool = False, return_depth: bool = False):
@@ -46,3 +53,34 @@ def get_dataset(dataset: str, img_size: int, mode: str = None, depth_dir: Union[
                                    image_dir=vg_image_dir,
                                    image_size=(img_size, img_size), max_objects=num_obj-1, left_right_flip=True)
     return data
+
+
+class ImagePathDataset(torch.utils.data.Dataset):
+    def __init__(self, files, transforms=None):
+        self.files = files
+        self.transforms = transforms
+
+    def __len__(self):
+        return len(self.files)
+
+    def __getitem__(self, i):
+        path = self.files[i]
+        img = Image.open(path).convert('RGB')
+
+        if self.transforms is not None:
+            img = self.transforms(img)
+
+        img = torch.from_numpy(np.array(img))
+        img = torch.permute(img, (2, 0, 1))
+
+        return img
+
+
+def get_image_files(path: Union[str, Path]) -> list[Path]:
+    '''Returns a list of paths to all image files in the specified path'''
+
+    path = Path(path)
+    files = sorted([file for ext in IMAGE_EXTENSIONS
+                    for file in path.glob('*.{}'.format(ext))])
+
+    return files
