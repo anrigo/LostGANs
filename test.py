@@ -1,5 +1,6 @@
 import argparse
 from collections import OrderedDict
+from matplotlib import pyplot as plt
 import numpy as np
 # from scipy import misc
 from imageio import imsave
@@ -75,8 +76,9 @@ def main(args):
         else:
             fake_images = netG.forward(z_obj, bbox.cuda(), z_im, label.squeeze(dim=-1))
         
-        imsave("{save_path}/sample_{idx}.jpg".format(save_path=args.sample_path, idx=idx),
-                    (fake_images[0].detach().permute(1, 2, 0)*0.5+0.5).type(torch.uint8).cpu().numpy())
+        result = normalize_tensor(fake_images[0].detach().permute(1, 2, 0)*0.5+0.5, (0,255)).type(torch.uint8).cpu().numpy()
+
+        imsave("{save_path}/sample_{idx}.jpg".format(save_path=args.sample_path, idx=idx), result)
 
 
 if __name__ == "__main__":
