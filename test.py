@@ -6,25 +6,17 @@ from imageio import imsave
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from tqdm import tqdm
 from data.cocostuff_loader import *
 from data.vg import *
 from model.resnet_generator_v2 import *
 from utils.util import *
+from data.datasets import get_dataset
 
 
-def get_dataloader(dataset = 'coco', img_size=128):
-    if dataset == 'coco':
-        dataset = CocoSceneGraphDataset(image_dir='./datasets/coco/images/val2017/',
-                                        instances_json='./datasets/coco/annotations/instances_val2017.json',
-                                        stuff_json='./datasets/coco/annotations/stuff_val2017.json',
-                                        stuff_only=True, image_size=(img_size, img_size), left_right_flip=False)
-    elif dataset == 'vg':
-        with open("./datasets/vg/vocab.json", "r") as read_file:
-            vocab = json.load(read_file)
-        dataset = VgSceneGraphDataset(vocab=vocab,
-                                      h5_path='./datasets/vg/val.h5',
-                                      image_dir='./datasets/vg/images/',
-                                      image_size=(128, 128), left_right_flip=False, max_objects=30)
+def get_dataloader(dataset = 'coco', img_size=128, return_depth=False):
+    
+    dataset = get_dataset(dataset, img_size, 'val', return_depth=return_depth)
 
     dataloader = torch.utils.data.DataLoader(
                     dataset, batch_size=1,
@@ -36,12 +28,17 @@ def main(args):
     num_classes = 184 if args.dataset == 'coco' else 179
     num_o = 8 if args.dataset == 'coco' else 31
 
-    dataloader = get_dataloader(args.dataset)
+    dataloader = get_dataloader(args.dataset, return_depth=args.use_depth)
 
-    netG = ResnetGenerator128(num_classes=num_classes, output_dim=3).cuda()
+    if args.use_depth:
+        netG = ResnetGeneratorDepth128(num_classes=num_classes, output_dim=3).cuda()
+    else:
+        netG = ResnetGenerator128(num_classes=num_classes, output_dim=3).cuda()
 
     if not os.path.isfile(args.model_path):
-        return
+        print('Model not found')
+        raise FileNotFoundError('Model not found')
+
     state_dict = torch.load(args.model_path)
 
     new_state_dict = OrderedDict()
@@ -60,14 +57,26 @@ def main(args):
     if not os.path.exists(args.sample_path):
         os.makedirs(args.sample_path)
     thres=2.0
-    for idx, data in enumerate(dataloader):
-        real_images, label, bbox = data
+
+    for idx, data in tqdm(enumerate(dataloader)):
+
+        if args.use_depth:
+            real_images, label, bbox, depths = data
+            depths = depths.cuda()
+        else:
+            real_images, label, bbox = data
+
         real_images, label = real_images.cuda(), label.long().unsqueeze(-1).cuda()
         z_obj = torch.from_numpy(truncted_random(num_o=num_o, thres=thres)).float().cuda()
         z_im = torch.from_numpy(truncted_random(num_o=1, thres=thres)).view(1, -1).float().cuda()
-        fake_images = netG.forward(z_obj, bbox.cuda(), z_im, label.squeeze(dim=-1))
+
+        if args.use_depth:
+            fake_images = netG.forward(z_obj, bbox.cuda(), z_im=z_im, y=label.squeeze(dim=-1), depths=depths)
+        else:
+            fake_images = netG.forward(z_obj, bbox.cuda(), z_im, label.squeeze(dim=-1))
+        
         imsave("{save_path}/sample_{idx}.jpg".format(save_path=args.sample_path, idx=idx),
-                    fake_images[0].cpu().detach().numpy().transpose(1, 2, 0)*0.5+0.5)
+                    (fake_images[0].detach().permute(1, 2, 0)*0.5+0.5).type(torch.uint8).cpu().numpy())
 
 
 if __name__ == "__main__":
@@ -78,5 +87,7 @@ if __name__ == "__main__":
                         help='which epoch to load')
     parser.add_argument('--sample_path', type=str, default='samples',
                         help='path to save generated images')
+    parser.add_argument('--use_depth', type=bool, default=False,
+                        help='use depth')
     args = parser.parse_args()
     main(args)
