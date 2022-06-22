@@ -24,13 +24,14 @@ def crop_resize(image, bbox, imsize=64, cropsize=28, label=None):
                 continue
             crop_image = image[idx:idx+1, :, int(imsize*bbox[idx, odx, 1]):int(imsize*(bbox[idx, odx, 1]+bbox[idx, odx, 3])),
                                int(imsize*bbox[idx, odx, 0]):int(imsize*(bbox[idx, odx, 0]+bbox[idx, odx, 2]))]
-            crop_image = F.interpolate(crop_image, size=(cropsize, cropsize), mode='bilinear')
+            crop_image = F.interpolate(crop_image, size=(
+                cropsize, cropsize), mode='bilinear')
             crop_images.append(crop_image)
             if label is not None:
                 rlabel.append(label[idx, odx, :].unsqueeze(0))
     # print(rlabel)
     if label is not None:
-        #if len(rlabel) % 2 == 1:
+        # if len(rlabel) % 2 == 1:
         #    return torch.cat(crop_images[:-1], dim=0), torch.cat(rlabel[:-1], dim=0)
         return torch.cat(crop_images, dim=0), torch.cat(rlabel, dim=0)
     return torch.cat(crop_images, dim=0)
@@ -89,8 +90,11 @@ class VGGLoss(nn.Module):
     def forward(self, x, y):
         x_vgg, y_vgg = self.vgg(x), self.vgg(y)
         loss = 0
+
         for i in range(len(x_vgg)):
-            loss += self.weights[i] * self.criterion(x_vgg[i], y_vgg[i].detach())
+            loss += self.weights[i] * \
+                self.criterion(x_vgg[i], y_vgg[i].detach())
+
         return loss
 
 
@@ -129,17 +133,21 @@ def scale_boxes(boxes: torch.Tensor, shape: 'tuple[int, int]', format: str = Non
         hh, ww = shape
 
         if format is None or format == 'coordinates':
+            # (xmin, ymin, xmax, ymax)
             bboxes[i] = torch.tensor(
                 (int(x*ww), int(y*hh), int(x*ww)+int(w*ww), int(y*hh)+int(h*hh)))
         elif format == 'size':
+            # (x, y, w, h)
             bboxes[i] = torch.tensor(
                 (int(x*ww), int(y*hh), int(w*ww), int(h*hh)))
         elif format == 'inverse_size':
+            # (y, x, h, w)
             bboxes[i] = torch.tensor(
                 (int(y*hh), int(x*ww), int(h*hh), int(w*ww)))
         else:
             raise ValueError('Unrecognized format')
-        
+
         if dtype is not None:
             bboxes = bboxes.type(dtype)
+
     return bboxes

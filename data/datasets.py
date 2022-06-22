@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Union
 
 import numpy as np
+from data.clevr import CLEVRDataset
 from data.cocostuff_loader import CocoSceneGraphDataset
 from data.vg import VgSceneGraphDataset
 import torch
@@ -35,6 +36,10 @@ def get_dataset(dataset: str, img_size: int, mode: str = None, depth_dir: Union[
         vg_h5_path = './datasets/vg/val.h5'
         vg_image_dir = './datasets/vg/images/'
 
+    clevr_image_dir = './datasets/CLEVR_v1.0/images/' + mode
+    clevr_scenes_json = './datasets/CLEVR_v1.0/scenes/' + \
+        f'CLEVR_{mode}_scenes.json'
+
     if depth_dir is None:
         depth_dir = Path('datasets', f'{dataset}-depth', mode)
 
@@ -52,6 +57,11 @@ def get_dataset(dataset: str, img_size: int, mode: str = None, depth_dir: Union[
         data = VgSceneGraphDataset(vocab=vocab, h5_path=vg_h5_path,
                                    image_dir=vg_image_dir,
                                    image_size=(img_size, img_size), max_objects=num_obj-1, left_right_flip=True)
+    elif dataset == 'clevr':
+        data = CLEVRDataset(image_dir=clevr_image_dir,
+                            scenes_json=clevr_scenes_json,
+                            image_size=(img_size, img_size))
+
     return data
 
 
