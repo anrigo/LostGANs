@@ -6,10 +6,11 @@ from torch.utils.data import Dataset
 from utils.util import normalize_tensor
 from PIL import Image
 import torchvision.transforms as T
+from torch.nn.functional import pad
 
 
 class CLEVRDataset(Dataset):
-    def __init__(self, image_dir: Union[str, Path], scenes_json: Union[str, Path], image_size: tuple[int, int], return_depth: bool = False) -> None:
+    def __init__(self, image_dir: Union[str, Path], scenes_json: Union[str, Path], image_size: tuple[int, int], max_objects_per_image=10, return_depth: bool = False) -> None:
         super(Dataset, self).__init__()
 
         self.image_dir = image_dir
@@ -17,6 +18,9 @@ class CLEVRDataset(Dataset):
         self.image_size = image_size
         self.return_depth = return_depth
         self.idx2label = generate_label_map()
+
+        # Each scene contains between 3 and 10 random objects
+        self.max_objects_per_image = max_objects_per_image
 
         # compose transforms to resize and convert to tensor
         transforms = []
@@ -44,12 +48,22 @@ class CLEVRDataset(Dataset):
 
         # extract bounding boxes from the objects' coordinates
         bboxes, labels = extract_bounding_boxes(scene, self.idx2label)
+
+        # add dummy objects to reach the desired number
+        for _ in range(len(labels), self.max_objects_per_image):
+            # label 0: dummy object __image__
+            labels.append(0)
+            bboxes.append((-0.6, -0.6, 0.5, 0.5))
+
         bboxes = torch.tensor(bboxes)
 
         if self.return_depth:
             # extract, invert and normalize depth values
             depths = [-1*obj['pixel_coords'][2] for obj in objs]
             depths = normalize_tensor(torch.tensor(depths), (0, 1))
+
+            # set dummy objects depth to -0.5
+            depths = pad(depths, (0, self.max_objects_per_image-depths.shape[0]), value=-0.5)
 
             return image, bboxes, labels, depths
 
@@ -65,6 +79,9 @@ def generate_label_map():
 
     names = [s + ' ' + c + ' ' + m + ' ' +
              sh for s in sizes for c in colors for m in materials for sh in shapes]
+
+    # add dummy objects' label
+    names.insert(0, '__image__')
 
     return names
 
@@ -117,7 +134,9 @@ def extract_bounding_boxes(scene, names):
         obj_name = obj['size'] + ' ' + obj['color'] + \
             ' ' + obj['material'] + ' ' + obj['shape']
         classes_text.append(obj_name.encode('utf8'))
-        classes.append(names.index(obj_name))
+
+        # shift by one because the first index is the dummy objects' label
+        classes.append(names.index(obj_name) + 1)
 
         ymin.append((y - height_d)/320.0)
         # ymax.append((y + height_u)/320.0)
