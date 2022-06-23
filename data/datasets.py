@@ -60,7 +60,7 @@ def get_dataset(dataset: str, img_size: int, mode: str = None, depth_dir: Union[
     elif dataset == 'clevr':
         data = CLEVRDataset(image_dir=clevr_image_dir,
                             scenes_json=clevr_scenes_json,
-                            image_size=(img_size, img_size))
+                            image_size=(img_size, img_size), return_depth=return_depth)
 
     return data
 

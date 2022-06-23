@@ -9,12 +9,13 @@ import torchvision.transforms as T
 
 
 class CLEVRDataset(Dataset):
-    def __init__(self, image_dir: Union[str, Path], scenes_json: Union[str, Path], image_size: tuple[int, int]) -> None:
+    def __init__(self, image_dir: Union[str, Path], scenes_json: Union[str, Path], image_size: tuple[int, int], return_depth: bool = False) -> None:
         super(Dataset, self).__init__()
 
         self.image_dir = image_dir
         self.scenes_json = scenes_json
         self.image_size = image_size
+        self.return_depth = return_depth
         self.idx2label = generate_label_map()
 
         # compose transforms to resize and convert to tensor
@@ -45,11 +46,14 @@ class CLEVRDataset(Dataset):
         bboxes, labels = extract_bounding_boxes(scene, self.idx2label)
         bboxes = torch.tensor(bboxes)
 
-        # extract, invert and normalize depth values
-        depths = [-1*obj['pixel_coords'][2] for obj in objs]
-        depths = normalize_tensor(torch.tensor(depths), (0, 1))
+        if self.return_depth:
+            # extract, invert and normalize depth values
+            depths = [-1*obj['pixel_coords'][2] for obj in objs]
+            depths = normalize_tensor(torch.tensor(depths), (0, 1))
 
-        return image, bboxes, labels, depths
+            return image, bboxes, labels, depths
+
+        return image, bboxes, labels
 
 
 def generate_label_map():
