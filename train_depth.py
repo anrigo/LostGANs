@@ -216,7 +216,7 @@ def main(args):
                         depthmap = torch.fliplr(depthmap)
 
                     # get depth layout
-                    depth_layout = udpt.get_depth_layout(depths[jdx], depthmap, bbox[jdx])
+                    depth_layout = udpt.get_depth_layout(depths[jdx], depthmap.shape[-2:], bbox[jdx]).unsqueeze(0)
 
                     depth_results.extend([
                         # normalize everything to [0,1]

@@ -117,7 +117,7 @@ def get_bboxes_depths(depthmap: torch.Tensor, boxes: torch.Tensor) -> torch.Tens
     return depths
 
 
-def get_depth_layout(depths: torch.Tensor, depthmap: torch.Tensor, boxes: torch.Tensor) -> torch.Tensor:
+def get_depth_layout(depths: torch.Tensor, size: tuple[int, int], boxes: torch.Tensor) -> torch.Tensor:
     '''
     Puts all bounding boxes depths in depth order in a single tensor to be visualized
     '''
@@ -128,28 +128,22 @@ def get_depth_layout(depths: torch.Tensor, depthmap: torch.Tensor, boxes: torch.
     # sort tuples by depth value, itemgetter gets the depth (position 1) from each tuple
     boxes_depths = sorted(boxes_depths, key=itemgetter(1))
 
-    # scale boxes to image size
-    # boxes with width and height
-    size_boxes = scale_boxes(
-        boxes, depthmap.shape[-2:], 'inverse_size', dtype=torch.int)
-
-    # crop the boxes from the depthmap
-    crops = [crop(depthmap, *(box.tolist()))
-             for box in size_boxes]
-
     # boxes with xmax and ymax
     coord_boxes = scale_boxes(
-        boxes, depthmap.shape[-2:], 'coordinates', dtype=torch.int)
+        boxes, size, 'coordinates', dtype=torch.int)
 
     # add bboxes depths to an empty depthmap in depth order
-    depth_layout = torch.zeros(depthmap.shape)
+    depth_layout = torch.zeros(size)
 
     for i, d in boxes_depths:
-        # create a tensor with every element equal to the bbox depth
-        patch = d.clone().repeat(crops[i].shape)
-        # write the depth values in the depthmap at the position of the bbox
+        # get bounding box coordinates
         x, y, xmax, ymax = coord_boxes[i]
 
+        # create a tensor with every element equal to the bbox depth
+        # of the same shape of the bounding box
+        patch = d.clone().repeat(depth_layout[..., y:ymax, x:xmax].shape)
+
+        # write the new values
         depth_layout[..., y:ymax, x:xmax] = patch
 
     return depth_layout
