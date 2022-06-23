@@ -1,8 +1,0 @@
-matplotlib
-numpy
-scikit-image
-opencv-python
-tensorboardX
-scipy
-Cython
-pycocotools
