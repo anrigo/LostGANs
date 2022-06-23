@@ -42,11 +42,11 @@ class CLEVRDataset(Dataset):
         image = self.transforms(image)
 
         # extract bounding boxes from the objects' coordinates
-        bboxes, labels, _ = extract_bounding_boxes(scene, self.idx2label)
+        bboxes, labels = extract_bounding_boxes(scene, self.idx2label)
         bboxes = torch.tensor(bboxes)
 
-        # extract and normalize depth values
-        depths = [obj['pixel_coords'][2] for obj in objs]
+        # extract, invert and normalize depth values
+        depths = [-1*obj['pixel_coords'][2] for obj in objs]
         depths = normalize_tensor(torch.tensor(depths), (0, 1))
 
         return image, bboxes, labels, depths
@@ -113,7 +113,7 @@ def extract_bounding_boxes(scene, names):
         obj_name = obj['size'] + ' ' + obj['color'] + \
             ' ' + obj['material'] + ' ' + obj['shape']
         classes_text.append(obj_name.encode('utf8'))
-        classes.append(names.index(obj_name) + 1)
+        classes.append(names.index(obj_name))
 
         ymin.append((y - height_d)/320.0)
         # ymax.append((y + height_u)/320.0)
@@ -126,4 +126,4 @@ def extract_bounding_boxes(scene, names):
     bboxes = [(xmin[i], ymin[i], widths[i], heights[i])
               for i in range(len(xmin))]
 
-    return bboxes, classes, classes_text
+    return bboxes, classes

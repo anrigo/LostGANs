@@ -94,6 +94,7 @@ def get_bboxes_depths(depthmap: torch.Tensor, boxes: torch.Tensor) -> torch.Tens
     num_o = boxes.shape[0]
 
     # exclude dummy objects
+    # always in the last rows of the tensor
     boxes = boxes[boxes[:, 0] >= 0]
 
     # scale boxes to image size
@@ -112,6 +113,8 @@ def get_bboxes_depths(depthmap: torch.Tensor, boxes: torch.Tensor) -> torch.Tens
     depths = normalize_tensor(depths, (0, 1))
 
     # set -0.5 depth to dummy objects
+    # since they are in the last rows
+    # simply append them
     depths = pad(depths, (0, num_o-depths.shape[0]), value=-0.5)
 
     return depths
@@ -124,7 +127,8 @@ def get_depth_layout(depths: torch.Tensor, size: tuple[int, int], boxes: torch.T
 
     # compose new depthmap for visualization
     # depths as list of tuples (box index, depth value)
-    boxes_depths = [(i, d) for i, d in enumerate(depths[depths > 0])]
+    # excluding dummy objects with negative depth
+    boxes_depths = [(i, d) for i, d in enumerate(depths[depths >= 0])]
     # sort tuples by depth value, itemgetter gets the depth (position 1) from each tuple
     boxes_depths = sorted(boxes_depths, key=itemgetter(1))
 

@@ -311,6 +311,7 @@ class CocoSceneGraphDataset(Dataset):
         # masks.append(torch.ones(self.mask_size, self.mask_size).long())
 
         # add 0 for number of objects
+        # append dummy objects to reach the desired number of objs for image
         for _ in range(len(objs), self.max_objects_per_image):
             objs.append(self.vocab['object_name_to_idx']['__image__'])
             boxes.append(np.array([-0.6, -0.6, 0.5, 0.5]))
