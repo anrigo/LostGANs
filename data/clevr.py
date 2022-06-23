@@ -46,7 +46,7 @@ class CLEVRDataset(Dataset):
         bboxes = torch.tensor(bboxes)
 
         # extract and normalize depth values
-        depths = [obj['3d_coords'][2] for obj in objs]
+        depths = [obj['pixel_coords'][2] for obj in objs]
         depths = normalize_tensor(torch.tensor(depths), (0, 1))
 
         return image, bboxes, labels, depths
