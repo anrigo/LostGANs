@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torchvision import models
+import torchvision.transforms as T
 import torch.nn.functional as F
 
 
@@ -98,18 +99,22 @@ class VGGLoss(nn.Module):
         return loss
 
 
-def normalize_tensor(tensor: torch.Tensor, range: 'tuple[float, float]') -> torch.Tensor:
+def normalize_tensor(tensor: torch.Tensor, range: 'tuple[float, float]', eps: float = 1e-12) -> torch.Tensor:
     '''
-    Normalize tensor to the given range
+    Normalize tensor to the given range using min-max normalization (rescaling)
 
     Args:
         tensor: data tensor
         range: tuple (min, max)
+        eps: small constant to avoid division by zero
     '''
+
     min_, max_ = tensor.min(), tensor.max()
     newmin, newmax = range
+    newmin, newmax = float(newmin), float(newmax)
     num = (tensor - min_) * (newmax - newmin)
-    return (num / (max_ - min_)) + newmin
+    den = max((max_ - min_), eps)
+    return (num / den) + newmin
 
 
 def scale_boxes(boxes: torch.Tensor, shape: 'tuple[int, int]', format: str = None, dtype: torch.dtype = None) -> torch.Tensor:
