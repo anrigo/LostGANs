@@ -205,7 +205,7 @@ def main(args):
 
                 print(f"Epoch: {epoch+1}, d_loss: {g_loss}")
 
-            if (idx+1) % 1 == 0:
+            if (idx+1) % 500 == 0:
                 elapsed = time.time() - start_time
                 elapsed = str(datetime.timedelta(seconds=elapsed))
                 logger.info("Time Elapsed: [{}]".format(elapsed))
@@ -303,7 +303,7 @@ if __name__ == "__main__":
     # train params
     args.dataset = 'clevr'
     # args.batch_size = 6
-    args.use_depth = True
-    args.model_name = 'depth-latent'
+    # args.use_depth = True
+    # args.model_name = 'depth-latent'
 
     main(args)
