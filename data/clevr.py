@@ -55,6 +55,8 @@ class CLEVRDataset(Dataset):
             labels.append(0)
             bboxes.append((-0.6, -0.6, 0.5, 0.5))
 
+        # convert everything to tensors
+        labels = torch.tensor(labels)
         bboxes = torch.tensor(bboxes)
 
         if self.return_depth:
@@ -65,9 +67,12 @@ class CLEVRDataset(Dataset):
             # set dummy objects depth to -0.5
             depths = pad(depths, (0, self.max_objects_per_image-depths.shape[0]), value=-0.5)
 
-            return image, bboxes, labels, depths
+            return image, labels, bboxes, depths
 
-        return image, bboxes, labels
+        return image, labels, bboxes
+
+    def __len__(self):
+        return len(self.scenes)
 
 
 def generate_label_map():
@@ -135,8 +140,7 @@ def extract_bounding_boxes(scene, names):
             ' ' + obj['material'] + ' ' + obj['shape']
         classes_text.append(obj_name.encode('utf8'))
 
-        # shift by one because the first index is the dummy objects' label
-        classes.append(names.index(obj_name) + 1)
+        classes.append(names.index(obj_name))
 
         ymin.append((y - height_d)/320.0)
         # ymax.append((y + height_u)/320.0)

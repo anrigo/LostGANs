@@ -4,7 +4,6 @@ import time
 import datetime
 import torch
 import torch.nn as nn
-from tensorboardX import SummaryWriter
 from torchvision.utils import make_grid
 
 from utils.util import *
@@ -14,7 +13,7 @@ from model.resnet_generator_v2 import *
 from model.rcnn_discriminator import *
 from model.sync_batchnorm import DataParallelWithCallback
 from utils.logger import setup_logger
-from data.datasets import get_dataset
+from data.datasets import get_dataset, get_num_classes_and_objects
 
 import wandb
 
@@ -37,16 +36,31 @@ import wandb
 
 def main(args):
 
-    wandb.tensorboard.patch(root_logdir=args.out_path)
-    wandb.init(project='lostgan', sync_tensorboard=True, mode='disabled')
-
     # parameters
     img_size = 128
     z_dim = 128
     lamb_obj = 1.0
     lamb_img = 0.1
-    num_classes = 184 if args.dataset == 'coco' else 179
-    num_obj = 8 if args.dataset == 'coco' else 31
+    num_classes, num_obj = get_num_classes_and_objects(args.dataset)
+
+    # log config
+    wandb.init(
+        project='lostgan-depth',
+        config={
+            'model': 'baseline',
+            'img_size': img_size,
+            'depth': False,
+            'num_classes': num_classes,
+            'num_obj': num_obj,
+            'z_dim': z_dim,
+            'lamb_obj': lamb_obj,
+            'lamb_img': lamb_img,
+            'g_lr': args.g_lr,
+            'd_lr': args.d_lr
+        },
+        # mode='disabled'
+    )
+    wandb.config.update(args)
 
     # data loader
     train_data = get_dataset(args.dataset, img_size, mode='train')
@@ -84,7 +98,7 @@ def main(args):
     for key, value in dict(netD.named_parameters()).items():
         if value.requires_grad:
             dis_parameters += [{'params': [value], 'lr': d_lr}]
-    
+
     # discriminator optimizer
     d_optimizer = torch.optim.Adam(dis_parameters, betas=(0, 0.999))
 
@@ -93,7 +107,6 @@ def main(args):
         os.mkdir(args.out_path)
     if not os.path.exists(os.path.join(args.out_path, 'model/')):
         os.mkdir(os.path.join(args.out_path, 'model/'))
-    writer = SummaryWriter(os.path.join(args.out_path, 'log'))
 
     logger = setup_logger("lostGAN", args.out_path, 0)
     logger.info(netG)
@@ -110,7 +123,8 @@ def main(args):
 
         for idx, data in enumerate(dataloader):
             real_images, label, bbox = data
-            real_images, label, bbox = real_images.cuda(), label.long().cuda().unsqueeze(-1), bbox.float()
+            real_images, label, bbox = real_images.cuda(
+            ), label.long().cuda().unsqueeze(-1), bbox.float()
 
             # update D network
             netD.zero_grad()
@@ -127,7 +141,8 @@ def main(args):
             d_loss_fake = torch.nn.ReLU()(1.0 + d_out_fake).mean()
             d_loss_fobj = torch.nn.ReLU()(1.0 + d_out_fobj).mean()
 
-            d_loss = lamb_obj * (d_loss_robj + d_loss_fobj) + lamb_img * (d_loss_real + d_loss_fake)
+            d_loss = lamb_obj * (d_loss_robj + d_loss_fobj) + \
+                lamb_img * (d_loss_real + d_loss_fake)
             d_loss.backward()
             d_optimizer.step()
 
@@ -139,8 +154,8 @@ def main(args):
                 "d_loss_fake": d_loss_fake.item(),
                 "d_loss_robj": d_loss_robj.item(),
                 "d_loss_fobj": d_loss_fobj.item()
-                })
-            
+            })
+
             print(f"Epoch: {epoch+1}, d_loss: {d_loss}")
 
             # update G network
@@ -149,7 +164,7 @@ def main(args):
                 g_out_fake, g_out_obj = netD(fake_images, bbox, label)
                 g_loss_fake = - g_out_fake.mean()
                 g_loss_obj = - g_out_obj.mean()
-                
+
                 pixel_loss = l1_loss(fake_images, real_images).mean()
                 feat_loss = vgg_loss(fake_images, real_images).mean()
 
@@ -165,7 +180,7 @@ def main(args):
                     "g_loss": g_loss.item(),
                     "pixel_loss": pixel_loss.item(),
                     "feat_loss": feat_loss.item()
-                    })
+                })
 
                 print(f"Epoch: {epoch+1}, d_loss: {g_loss}")
 
@@ -174,19 +189,16 @@ def main(args):
                 elapsed = str(datetime.timedelta(seconds=elapsed))
                 logger.info("Time Elapsed: [{}]".format(elapsed))
                 logger.info("Step[{}/{}], d_out_real: {:.4f}, d_out_fake: {:.4f}, g_out_fake: {:.4f} ".format(epoch + 1,
-                                                                                                        idx + 1,
-                                                                                                        d_loss_real.item(),
-                                                                                                        d_loss_fake.item(),
-                                                                                                        g_loss_fake.item()))
+                                                                                                              idx + 1,
+                                                                                                              d_loss_real.item(),
+                                                                                                              d_loss_fake.item(),
+                                                                                                              g_loss_fake.item()))
                 logger.info("             d_obj_real: {:.4f}, d_obj_fake: {:.4f}, g_obj_fake: {:.4f} ".format(
-                                                                                                        d_loss_robj.item(),
-                                                                                                        d_loss_fobj.item(),
-                                                                                                        g_loss_obj.item()))
-                logger.info("             pixel_loss: {:.4f}, feat_loss: {:.4f}".format(pixel_loss.item(), feat_loss.item()))
-
-
-                writer.add_image("real images", make_grid(real_images.cpu().data * 0.5 + 0.5, nrow=4), epoch*len(dataloader) + idx + 1)
-                writer.add_image("fake images", make_grid(fake_images.cpu().data * 0.5 + 0.5, nrow=4), epoch*len(dataloader) + idx + 1)
+                    d_loss_robj.item(),
+                    d_loss_fobj.item(),
+                    g_loss_obj.item()))
+                logger.info("             pixel_loss: {:.4f}, feat_loss: {:.4f}".format(
+                    pixel_loss.item(), feat_loss.item()))
 
                 wandb.log({
                     "real_images": wandb.Image(make_grid(real_images.cpu().data * 0.5 + 0.5, nrow=4)),
@@ -195,8 +207,9 @@ def main(args):
 
         # save model
         if (epoch + 1) % 5 == 0:
-            torch.save(netG.state_dict(), os.path.join(args.out_path, 'model/', 'G_%d.pth' % (epoch+1)))
-    
+            torch.save(netG.state_dict(), os.path.join(
+                args.out_path, 'model/', 'G_%d.pth' % (epoch+1)))
+
     wandb.finish()
 
 
@@ -216,12 +229,12 @@ if __name__ == "__main__":
                         help='path to output files')
     args = parser.parse_args()
 
+    # import os
+    # os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
+
     # train params
-    # args.dataset = 'vg'
-    # args.out_path = 'outputs/out-vg/'
-    
-    args.dataset = 'coco'
-    args.out_path = 'outputs/coco2/'
+    args.dataset = 'clevr'
+    args.out_path = 'outputs/clevr/'
 
     args.batch_size = 32
     args.total_epoch = 200

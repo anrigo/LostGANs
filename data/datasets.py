@@ -15,13 +15,8 @@ IMAGE_EXTENSIONS = {'bmp', 'jpg', 'jpeg', 'pgm', 'png', 'ppm',
 
 def get_dataset(dataset: str, img_size: int, mode: str = None, depth_dir: Union[str, Path] = None, num_obj: int = None, return_filenames: bool = False, return_depth: bool = False):
 
-    num_classes = 184 if dataset == 'coco' else 179
-
     if depth_dir is None:
         depth_dir = Path('datasets', dataset + '-depth', mode)
-
-    if num_obj is None:
-        num_obj = 8 if dataset == 'coco' else 31
 
     if mode is None or mode == 'train':
         coco_image_dir = './datasets/coco/images/train2017/'
@@ -54,6 +49,9 @@ def get_dataset(dataset: str, img_size: int, mode: str = None, depth_dir: Union[
         with open('./datasets/vg/vocab.json', 'r') as fj:
             vocab = json.load(fj)
 
+        if num_obj is None:
+            num_obj = 31
+
         data = VgSceneGraphDataset(vocab=vocab, h5_path=vg_h5_path,
                                    image_dir=vg_image_dir,
                                    image_size=(img_size, img_size), max_objects=num_obj-1, left_right_flip=True)
@@ -63,6 +61,15 @@ def get_dataset(dataset: str, img_size: int, mode: str = None, depth_dir: Union[
                             image_size=(img_size, img_size), return_depth=return_depth)
 
     return data
+
+
+def get_num_classes_and_objects(dataset: str) -> tuple[int, int]:
+    """ Returns (number of classes, number of objects per image) for the desired dataset """
+    return {
+        'coco': (184, 8),
+        'vg': (179, 31),
+        'clevr': (97, 10)
+    }[dataset]
 
 
 class ImagePathDataset(torch.utils.data.Dataset):
