@@ -4,8 +4,7 @@ import time
 import datetime
 import torch
 import torch.nn as nn
-from torchvision.utils import make_grid
-
+from torchvision.utils import make_grid, draw_bounding_boxes
 from utils.util import *
 from data.cocostuff_loader import *
 from data.vg import *
@@ -14,7 +13,7 @@ from model.rcnn_discriminator import *
 from model.sync_batchnorm import DataParallelWithCallback
 from utils.logger import setup_logger
 from data.datasets import get_dataset, get_num_classes_and_objects
-
+import utils.depth as udpt
 import wandb
 
 
@@ -43,13 +42,19 @@ def main(args):
     lamb_img = 0.1
     num_classes, num_obj = get_num_classes_and_objects(args.dataset)
 
+    # depth layouts / maps to visualize
+    disp_depth = 6
+    disp_depth = disp_depth if disp_depth < args.batch_size else args.batch_size
+
+    # output directory
+    args.out_path = os.path.join(
+        args.out_path, args.dataset + '-' + args.model_name)
+
     # log config
     wandb.init(
         project='lostgan-depth',
         config={
-            'model': 'baseline',
             'img_size': img_size,
-            'depth': False,
             'num_classes': num_classes,
             'num_obj': num_obj,
             'z_dim': z_dim,
@@ -63,15 +68,21 @@ def main(args):
     wandb.config.update(args)
 
     # data loader
-    train_data = get_dataset(args.dataset, img_size, mode='train')
+    train_data = get_dataset(args.dataset, img_size, mode='train',
+                             return_depth=args.use_depth, return_filenames=args.use_depth)
 
     dataloader = torch.utils.data.DataLoader(
         train_data, batch_size=args.batch_size,
         drop_last=True, shuffle=True, num_workers=8)
 
     # Load model
-    netG = ResnetGenerator128(num_classes=num_classes, output_dim=3).cuda()
-    netD = CombineDiscriminator128(num_classes=num_classes).cuda()
+    if args.use_depth:
+        netG = ResnetGeneratorDepth128(
+            num_classes=num_classes, output_dim=3).cuda()
+        netD = CombineDiscriminator128(num_classes=num_classes).cuda()
+    else:
+        netG = ResnetGenerator128(num_classes=num_classes, output_dim=3).cuda()
+        netD = CombineDiscriminator128(num_classes=num_classes).cuda()
 
     parallel = True
     if parallel:
@@ -122,7 +133,13 @@ def main(args):
         netD.train()
 
         for idx, data in enumerate(dataloader):
-            real_images, label, bbox = data
+
+            if args.use_depth:
+                real_images, label, bbox, depths = data
+                depths = depths.cuda()
+            else:
+                real_images, label, bbox = data
+
             real_images, label, bbox = real_images.cuda(
             ), label.long().cuda().unsqueeze(-1), bbox.float()
 
@@ -136,7 +153,11 @@ def main(args):
             # z_obj, random latent object appearance
             z = torch.randn(real_images.size(0), num_obj, z_dim).cuda()
 
-            fake_images = netG(z, bbox, y=label.squeeze(dim=-1))
+            if args.use_depth:
+                fake_images = netG(z, bbox, y=label.squeeze(dim=-1), depths=depths)
+            else:
+                fake_images = netG(z, bbox, y=label.squeeze(dim=-1))
+            
             d_out_fake, d_out_fobj = netD(fake_images.detach(), bbox, label)
             d_loss_fake = torch.nn.ReLU()(1.0 + d_out_fake).mean()
             d_loss_fobj = torch.nn.ReLU()(1.0 + d_out_fobj).mean()
@@ -184,26 +205,69 @@ def main(args):
 
                 print(f"Epoch: {epoch+1}, d_loss: {g_loss}")
 
-            if (idx+1) % 500 == 0:
+            if (idx+1) % 1 == 0:
                 elapsed = time.time() - start_time
                 elapsed = str(datetime.timedelta(seconds=elapsed))
                 logger.info("Time Elapsed: [{}]".format(elapsed))
-                logger.info("Step[{}/{}], d_out_real: {:.4f}, d_out_fake: {:.4f}, g_out_fake: {:.4f} ".format(epoch + 1,
-                                                                                                              idx + 1,
-                                                                                                              d_loss_real.item(),
-                                                                                                              d_loss_fake.item(),
-                                                                                                              g_loss_fake.item()))
+                logger.info("Step[{}/{}], d_out_real: {:.4f}, d_out_fake: {:.4f}, g_out_fake: {:.4f} ".format(
+                    epoch + 1,
+                    idx + 1,
+                    d_loss_real.item(),
+                    d_loss_fake.item(),
+                    g_loss_fake.item())
+                )
                 logger.info("             d_obj_real: {:.4f}, d_obj_fake: {:.4f}, g_obj_fake: {:.4f} ".format(
                     d_loss_robj.item(),
                     d_loss_fobj.item(),
-                    g_loss_obj.item()))
+                    g_loss_obj.item())
+                )
                 logger.info("             pixel_loss: {:.4f}, feat_loss: {:.4f}".format(
-                    pixel_loss.item(), feat_loss.item()))
+                    pixel_loss.item(), feat_loss.item())
+                )
 
+                # put images in a grid tensor
+                # * 0.5 + 0.5 normalizes images to [0,1]
+                real_grid = make_grid(
+                    real_images.cpu().data * 0.5 + 0.5, nrow=4)
+                fake_grid = make_grid(
+                    fake_images.cpu().data * 0.5 + 0.5, nrow=4)
+                
                 wandb.log({
-                    "real_images": wandb.Image(make_grid(real_images.cpu().data * 0.5 + 0.5, nrow=4)),
-                    "fake_images": wandb.Image(make_grid(fake_images.cpu().data * 0.5 + 0.5, nrow=4))
+                    "real_images": wandb.Image(real_grid),
+                    "fake_images": wandb.Image(fake_grid)
                 })
+
+                if args.use_depth:
+                    depth_results = []
+
+                    # visualize the first disp_depth images and their depth layouts
+                    for jdx in range(disp_depth):
+                        coord_box = scale_boxes(
+                            bbox[jdx], train_data.image_size, 'coordinates', dtype=torch.int)
+
+                        # draw boxes
+                        ann_img = normalize_tensor(
+                            real_images[jdx].cpu()*0.5+0.5, (0, 255)).type(torch.uint8)
+                        ann_img = draw_bounding_boxes(ann_img, coord_box)
+
+                        # get depth layout
+                        depth_layout = udpt.get_depth_layout(
+                            depths[jdx], train_data.image_size, bbox[jdx]).unsqueeze(0)
+
+                        depth_results.extend([
+                            # normalize everything to [0,1]
+                            normalize_tensor(ann_img.type(torch.float32), (0, 1)),
+                            # already in [0,1]
+                            torch.cat((depth_layout, depth_layout,
+                                    depth_layout), 0).cpu(),
+                            (fake_images[jdx]*0.5+0.5).cpu()
+                        ])
+
+                    depth_grid = make_grid(depth_results, nrow=3)
+
+                    wandb.log({
+                        "depth_results": wandb.Image(depth_grid)
+                    })
 
         # save model
         if (epoch + 1) % 5 == 0:
@@ -217,7 +281,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset', type=str, default='coco',
                         help='training dataset')
-    parser.add_argument('--batch_size', type=int, default=128,
+    parser.add_argument('--batch_size', type=int, default=32,
                         help='mini-batch size of training data. Default: 32')
     parser.add_argument('--total_epoch', type=int, default=200,
                         help='number of total training epoch')
@@ -227,16 +291,19 @@ if __name__ == "__main__":
                         help='learning rate for generator')
     parser.add_argument('--out_path', type=str, default='./outputs/',
                         help='path to output files')
+    parser.add_argument('--use_depth', type=bool, default=False,
+                        help='use depth information')
+    parser.add_argument('--model_name', type=str, default='baseline',
+                        help='use depth information')
     args = parser.parse_args()
 
-    # import os
+
     # os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
     # train params
     args.dataset = 'clevr'
-    args.out_path = 'outputs/clevr/'
-
-    args.batch_size = 32
-    args.total_epoch = 200
+    # args.batch_size = 6
+    args.use_depth = True
+    args.model_name = 'depth-latent'
 
     main(args)
