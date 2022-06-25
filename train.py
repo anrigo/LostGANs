@@ -48,7 +48,7 @@ def main(args):
 
     # output directory
     args.out_path = os.path.join(
-        args.out_path, args.dataset + '-' + args.model_name)
+        args.out_path, args.dataset + '-' + args.model)
 
     # log config
     wandb.init(
@@ -295,7 +295,7 @@ if __name__ == "__main__":
                         help='path to output files')
     parser.add_argument('--use_depth', action=argparse.BooleanOptionalAction,
                         default=False, help='use depth information')
-    parser.add_argument('--model_name', type=str, default='baseline',
+    parser.add_argument('--model', type=str, default='baseline',
                         help='short model name')
     args = parser.parse_args()
 
