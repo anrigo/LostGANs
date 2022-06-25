@@ -69,7 +69,7 @@ def main(args):
 
     # data loader
     train_data = get_dataset(args.dataset, img_size, mode='train',
-                             return_depth=args.use_depth, return_filenames=args.use_depth)
+                             return_depth=args.use_depth)
 
     dataloader = torch.utils.data.DataLoader(
         train_data, batch_size=args.batch_size,
@@ -154,10 +154,11 @@ def main(args):
             z = torch.randn(real_images.size(0), num_obj, z_dim).cuda()
 
             if args.use_depth:
-                fake_images = netG(z, bbox, y=label.squeeze(dim=-1), depths=depths)
+                fake_images = netG(
+                    z, bbox, y=label.squeeze(dim=-1), depths=depths)
             else:
                 fake_images = netG(z, bbox, y=label.squeeze(dim=-1))
-            
+
             d_out_fake, d_out_fobj = netD(fake_images.detach(), bbox, label)
             d_loss_fake = torch.nn.ReLU()(1.0 + d_out_fake).mean()
             d_loss_fobj = torch.nn.ReLU()(1.0 + d_out_fobj).mean()
@@ -228,10 +229,10 @@ def main(args):
                 # put images in a grid tensor
                 # * 0.5 + 0.5 normalizes images to [0,1]
                 real_grid = make_grid(
-                    real_images.cpu().data * 0.5 + 0.5, nrow=4)
+                    normalize_tensor(real_images, (0, 1)).cpu(), nrow=4)
                 fake_grid = make_grid(
-                    fake_images.cpu().data * 0.5 + 0.5, nrow=4)
-                
+                    normalize_tensor(fake_images, (0, 1)).cpu(), nrow=4)
+
                 wandb.log({
                     "real_images": wandb.Image(real_grid),
                     "fake_images": wandb.Image(fake_grid)
@@ -247,7 +248,7 @@ def main(args):
 
                         # draw boxes
                         ann_img = normalize_tensor(
-                            real_images[jdx].cpu()*0.5+0.5, (0, 255)).type(torch.uint8)
+                            real_images[jdx].cpu(), (0, 255)).type(torch.uint8)
                         ann_img = draw_bounding_boxes(ann_img, coord_box)
 
                         # get depth layout
@@ -256,11 +257,12 @@ def main(args):
 
                         depth_results.extend([
                             # normalize everything to [0,1]
-                            normalize_tensor(ann_img.type(torch.float32), (0, 1)),
+                            normalize_tensor(ann_img.type(
+                                torch.float32), (0, 1)),
                             # already in [0,1]
                             torch.cat((depth_layout, depth_layout,
-                                    depth_layout), 0).cpu(),
-                            (fake_images[jdx]*0.5+0.5).cpu()
+                                       depth_layout), 0).cpu(),
+                            normalize_tensor(fake_images[jdx], (0, 1)).cpu()
                         ])
 
                     depth_grid = make_grid(depth_results, nrow=3)
@@ -291,12 +293,11 @@ if __name__ == "__main__":
                         help='learning rate for generator')
     parser.add_argument('--out_path', type=str, default='./outputs/',
                         help='path to output files')
-    parser.add_argument('--use_depth', type=bool, default=False,
-                        help='use depth information')
+    parser.add_argument('--use_depth', action=argparse.BooleanOptionalAction,
+                        default=False, help='use depth information')
     parser.add_argument('--model_name', type=str, default='baseline',
-                        help='use depth information')
+                        help='short model name')
     args = parser.parse_args()
-
 
     # os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
