@@ -99,18 +99,19 @@ class VGGLoss(nn.Module):
         return loss
 
 
-def normalize_tensor(tensor: torch.Tensor, range: 'tuple[float, float]', eps: float = 1e-12) -> torch.Tensor:
+def normalize_tensor(tensor: torch.Tensor, to_: 'tuple[float, float]', from_: 'tuple[float, float]' = None, eps: float = 1e-12) -> torch.Tensor:
     '''
     Normalize tensor to the given range using min-max normalization (rescaling)
 
     Args:
         tensor: data tensor
-        range: tuple (min, max)
+        to: tuple (min, max) target range
+        from: tuple (min, max) input data range, if not specified max and min of the input will be used
         eps: small constant to avoid division by zero
     '''
 
-    min_, max_ = tensor.min(), tensor.max()
-    newmin, newmax = range
+    min_, max_ = (tensor.min(), tensor.max()) if from_ is None else from_
+    newmin, newmax = to_
     newmin, newmax = float(newmin), float(newmax)
     num = (tensor - min_) * (newmax - newmin)
     den = max((max_ - min_), eps)

@@ -227,11 +227,10 @@ def main(args):
                 )
 
                 # put images in a grid tensor
-                # * 0.5 + 0.5 normalizes images to [0,1]
-                real_grid = make_grid(
-                    normalize_tensor(real_images, (0, 1)).cpu(), nrow=4)
-                fake_grid = make_grid(
-                    normalize_tensor(fake_images, (0, 1)).cpu(), nrow=4)
+                # all images are in [-1,1]
+                # normalize to [0,1] for visualization
+                real_grid = make_grid(((real_images + 1) / 2).cpu(), nrow=4)
+                fake_grid = make_grid(((fake_images + 1) / 2).cpu(), nrow=4)
 
                 wandb.log({
                     "real_images": wandb.Image(real_grid),
@@ -246,9 +245,10 @@ def main(args):
                         coord_box = scale_boxes(
                             bbox[jdx], train_data.image_size, 'coordinates', dtype=torch.int)
 
+                        # normalize form [-1,1] to [0,255]
+                        ann_img = (
+                            (real_images[jdx] + 1) / 2 * 255).type(torch.uint8).cpu()
                         # draw boxes
-                        ann_img = normalize_tensor(
-                            real_images[jdx].cpu(), (0, 255)).type(torch.uint8)
                         ann_img = draw_bounding_boxes(ann_img, coord_box)
 
                         # get depth layout
@@ -256,13 +256,13 @@ def main(args):
                             depths[jdx], train_data.image_size, bbox[jdx]).unsqueeze(0)
 
                         depth_results.extend([
-                            # normalize everything to [0,1]
-                            normalize_tensor(ann_img.type(
-                                torch.float32), (0, 1)),
+                            # normalize from [0,255] to [0,1]
+                            ann_img.type(torch.float32) / 255,
                             # already in [0,1]
                             torch.cat((depth_layout, depth_layout,
                                        depth_layout), 0).cpu(),
-                            normalize_tensor(fake_images[jdx], (0, 1)).cpu()
+                            # from [-1,1] to [0,1]
+                            ((fake_images[jdx] + 1) / 2).cpu()
                         ])
 
                     depth_grid = make_grid(depth_results, nrow=3)
@@ -298,8 +298,6 @@ if __name__ == "__main__":
     parser.add_argument('--model', type=str, default='baseline',
                         help='short model name')
     args = parser.parse_args()
-
-    # os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
     # train params
     args.dataset = 'clevr'

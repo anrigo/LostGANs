@@ -46,6 +46,10 @@ class CLEVRDataset(Dataset):
         image = Image.open(image_path).convert('RGB')
         image = self.transforms(image)
 
+        # clevr images are in [0,1]
+        # normalize to [-1,1]
+        image = (image * 2) - 1
+
         # extract bounding boxes from the objects' coordinates
         bboxes, labels = extract_bounding_boxes(scene, self.idx2label)
 
