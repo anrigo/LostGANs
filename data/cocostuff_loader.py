@@ -12,7 +12,7 @@ from skimage.transform import resize as imresize
 import pycocotools.mask as mask_utils
 from random import shuffle
 
-from utils.depth import get_bboxes_depths
+from utils.depth import get_bboxes_depths_from_depthmap
 
 
 class CocoSceneGraphDataset(Dataset):
@@ -402,7 +402,7 @@ class CocoSceneGraphDataset(Dataset):
                 # flip the depthmap as the image is also flipped
                 depthmap = torch.fliplr(depthmap)
             
-            depths = get_bboxes_depths(depthmap, torch.from_numpy(boxes))
+            depths = get_bboxes_depths_from_depthmap(depthmap, torch.from_numpy(boxes))
 
             if self.return_filenames:
                 return image, objs, boxes, depths, filename, flip

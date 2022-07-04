@@ -1,3 +1,4 @@
+from cProfile import label
 import json
 from pathlib import Path
 from typing import Union
@@ -10,14 +11,20 @@ from torch.nn.functional import pad
 
 
 class CLEVRDataset(Dataset):
-    def __init__(self, image_dir: Union[str, Path], scenes_json: Union[str, Path], image_size: tuple[int, int], max_objects_per_image=10, return_depth: bool = False) -> None:
+    def __init__(self, image_dir: Union[str, Path], scenes_json: Union[str, Path], image_size: tuple[int, int], max_objects_per_image=10, return_depth: bool = False, occlusions: bool = False) -> None:
         super(Dataset, self).__init__()
 
         self.image_dir = image_dir
         self.scenes_json = scenes_json
         self.image_size = image_size
         self.return_depth = return_depth
-        self.idx2label = generate_label_map()
+        self.occlusions = occlusions
+
+        if self.occlusions:
+            self.idx2label = ('__image__', 'cube', 'sphere', 'cylinder')
+        else:
+            # 97 classes, size + color + material + shape
+            self.idx2label = generate_label_map()
 
         # Each scene contains between 3 and 10 random objects
         self.max_objects_per_image = max_objects_per_image
@@ -50,8 +57,12 @@ class CLEVRDataset(Dataset):
         # normalize to [-1,1]
         image = (image * 2) - 1
 
-        # extract bounding boxes from the objects' coordinates
-        bboxes, labels = extract_bounding_boxes(scene, self.idx2label)
+        if self.occlusions:
+            # read bounding boxes from annotations
+            bboxes, labels = parse_bounding_boxes(scene, self.idx2label)
+        else:
+            # extract bounding boxes from the objects' coordinates
+            bboxes, labels = extract_bounding_boxes(scene, self.idx2label)
 
         # add dummy objects to reach the desired number
         for _ in range(len(labels), self.max_objects_per_image):
@@ -80,11 +91,11 @@ class CLEVRDataset(Dataset):
 
 
 def generate_label_map():
-    sizes = ['large', 'small']
-    colors = ['gray', 'red', 'blue', 'green',
-              'brown', 'purple', 'cyan', 'yellow']
-    materials = ['rubber', 'metal']
-    shapes = ['cube', 'sphere', 'cylinder']
+    sizes = ('large', 'small')
+    colors = ('gray', 'red', 'blue', 'green',
+              'brown', 'purple', 'cyan', 'yellow')
+    materials = ('rubber', 'metal')
+    shapes = ('cube', 'sphere', 'cylinder')
 
     names = [s + ' ' + c + ' ' + m + ' ' +
              sh for s in sizes for c in colors for m in materials for sh in shapes]
@@ -93,6 +104,13 @@ def generate_label_map():
     names.insert(0, '__image__')
 
     return names
+
+
+def parse_bounding_boxes(scene, idx2label):
+    bboxes = [(obj['x'], obj['y'], obj['width'], obj['height']) for obj in scene['objects']]
+    labels = [idx2label.index(obj['shape']) for obj in scene['objects']]
+
+    return bboxes, labels
 
 
 def extract_bounding_boxes(scene, names):

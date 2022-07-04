@@ -18,22 +18,21 @@ def get_dataset(dataset: str, img_size: int, mode: str = None, depth_dir: Union[
     if depth_dir is None:
         depth_dir = Path('datasets', dataset + '-depth', mode)
 
-    if mode is None or mode == 'train':
-        coco_image_dir = './datasets/coco/images/train2017/'
-        coco_instances_json = './datasets/coco/annotations/instances_train2017.json'
-        coco_stuff_json = './datasets/coco/annotations/stuff_train2017.json'
-        vg_h5_path = './datasets/vg/train.h5'
-        vg_image_dir = './datasets/vg/images/'
-    elif mode == 'val':
-        coco_image_dir = './datasets/coco/images/val2017/'
-        coco_instances_json = './datasets/coco/annotations/instances_val2017.json'
-        coco_stuff_json = './datasets/coco/annotations/stuff_val2017.json'
-        vg_h5_path = './datasets/vg/val.h5'
-        vg_image_dir = './datasets/vg/images/'
+    if mode is None:
+        mode = 'train'
 
-    clevr_image_dir = './datasets/CLEVR_v1.0/images/' + mode
-    clevr_scenes_json = './datasets/CLEVR_v1.0/scenes/' + \
-        f'CLEVR_{mode}_scenes.json'
+    coco_image_dir = f'./datasets/coco/images/{mode}2017/'
+    coco_instances_json = f'./datasets/coco/annotations/instances_{mode}2017.json'
+    coco_stuff_json = f'./datasets/coco/annotations/stuff_{mode}2017.json'
+
+    vg_h5_path = './datasets/vg/{mode}.h5'
+    vg_image_dir = './datasets/vg/images/'
+
+    clevr_image_dir = f'./datasets/CLEVR_v1.0/images/{mode}'
+    clevr_scenes_json = f'./datasets/CLEVR_v1.0/scenes/CLEVR_{mode}_scenes.json'
+
+    clevr_occs_image_dir = f'./datasets/CLEVR_occlusions/images/{mode}'
+    clevr_occs_scenes_json = f'./datasets/CLEVR_occlusions/scenes/CLEVR_{mode}_scenes.json'
 
     if depth_dir is None:
         depth_dir = Path('datasets', f'{dataset}-depth', mode)
@@ -59,16 +58,21 @@ def get_dataset(dataset: str, img_size: int, mode: str = None, depth_dir: Union[
         data = CLEVRDataset(image_dir=clevr_image_dir,
                             scenes_json=clevr_scenes_json,
                             image_size=(img_size, img_size), return_depth=return_depth)
+    elif dataset == 'clevr-occs':
+        data = CLEVRDataset(image_dir=clevr_occs_image_dir,
+                            scenes_json=clevr_occs_scenes_json,
+                            image_size=(img_size, img_size), return_depth=return_depth, occlusions=True)
 
     return data
 
 
 def get_num_classes_and_objects(dataset: str) -> tuple[int, int]:
-    """ Returns (number of classes, number of objects per image) for the desired dataset """
+    """ Returns (number of classes, maximum number of objects per image) for the desired dataset """
     return {
         'coco': (184, 8),
         'vg': (179, 31),
-        'clevr': (97, 10)
+        'clevr': (97, 10),
+        'clevr-occs': (4, 10)
     }[dataset]
 
 

@@ -85,7 +85,7 @@ def depth_estimation(dataset, ds, mode, visualize=True, save=False, limit=None):
                 np.save(Path(save_path, filename + '.npy'), prediction)
 
 
-def get_bboxes_depths(depthmap: torch.Tensor, boxes: torch.Tensor) -> torch.Tensor:
+def get_bboxes_depths_from_depthmap(depthmap: torch.Tensor, boxes: torch.Tensor) -> torch.Tensor:
     '''
     Computes depth values for each bounding box from the depthmap
     '''
