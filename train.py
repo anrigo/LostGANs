@@ -300,7 +300,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # train params
-    args.dataset = 'clevr'
+    # args.dataset = 'clevr'
     # args.batch_size = 6
     # args.use_depth = True
     # args.model_name = 'depth-latent'

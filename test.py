@@ -13,7 +13,7 @@ from data.datasets import get_dataset, get_num_classes_and_objects
 
 def get_dataloader(dataset='coco', img_size=128, return_depth=False):
 
-    dataset = get_dataset(dataset, img_size, 'val', return_depth=return_depth)
+    dataset = get_dataset(dataset, img_size, 'test', return_depth=return_depth)
 
     dataloader = torch.utils.data.DataLoader(
         dataset, batch_size=1,
