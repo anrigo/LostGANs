@@ -30,7 +30,7 @@ def get_image_path_loader(path, batch_size, num_workers):
 
 
 def compute_metrics(real_path, fake_path, batch_size, num_workers, device='cuda'):
-    '''Given two dataloaders'''
+    '''Given two paths to real and fake images, computes metrics on them'''
 
     # dataloaders for images only, so they are both in the same format
     real_dataloader = get_image_path_loader(
