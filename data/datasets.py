@@ -97,7 +97,7 @@ class ImagePathDataset(torch.utils.data.Dataset):
         return img
 
 
-def get_image_files(path: Union[str, Path]) -> list[Path]:
+def get_image_files_in_path(path: Union[str, Path]) -> list[Path]:
     '''Returns a list of paths to all image files in the specified path'''
 
     path = Path(path)

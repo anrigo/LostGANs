@@ -1,5 +1,6 @@
 import argparse
 from collections import OrderedDict
+import shutil
 # from scipy import misc
 from imageio import imsave
 import torch
@@ -8,56 +9,61 @@ from data.cocostuff_loader import *
 from data.vg import *
 from model.resnet_generator_v2 import *
 from utils.util import *
-from data.datasets import get_dataset, get_num_classes_and_objects
+import torchvision.transforms as TF
+from data.datasets import ImagePathDataset, get_dataset, get_image_files_in_path, get_num_classes_and_objects
+from torchmetrics.image.fid import FrechetInceptionDistance
+from torchmetrics.image.inception import InceptionScore
 
 
-def get_dataloader(dataset='coco', img_size=128, return_depth=False):
+def get_image_path_loader(path, batch_size, num_workers):
+    files = get_image_files_in_path(path)
 
-    dataset = get_dataset(dataset, img_size, 'test', return_depth=return_depth)
+    dataset = ImagePathDataset(files, transforms=TF.Resize(
+        (299, 299)))  # resize to 299x299 as in original paper
+    dataloader = torch.utils.data.DataLoader(dataset,
+                                             batch_size=batch_size,
+                                             shuffle=False,
+                                             drop_last=False,
+                                             num_workers=num_workers)
+
+    return dataloader
+
+
+def compute_metrics(real_path, fake_path, batch_size, num_workers, device='cuda'):
+    '''Given two dataloaders'''
+
+    # dataloaders for images only, so they are both in the same format
+    real_dataloader = get_image_path_loader(
+        real_path, 50, os.cpu_count())
+    fake_dataloader = get_image_path_loader(
+        fake_path, 50, os.cpu_count())
+
+    fid = FrechetInceptionDistance(feature=2048).to(device)
+    inception = InceptionScore().to(device)
+
+    for batch in tqdm(real_dataloader):
+        batch = batch.to(device)
+
+        fid.update(batch, real=True)
+
+    for batch in tqdm(fake_dataloader):
+        batch = batch.to(device)
+
+        fid.update(batch, real=False)
+        inception.update(batch)
+
+    return fid.compute(), inception.compute()[0]
+
+
+def sample_test(netG, dataset, num_obj, sample_path):
+    '''Samples images from the model using the provided split layouts and saves them in sample_path'''
 
     dataloader = torch.utils.data.DataLoader(
         dataset, batch_size=1,
         drop_last=True, shuffle=False, num_workers=1)
-    return dataloader
 
-
-def main(args):
-    num_classes, num_obj = get_num_classes_and_objects(args.dataset)
-
-    # output directory
-    args.sample_path = os.path.join(
-        args.sample_path, args.dataset + '-' + args.model)
-
-    dataloader = get_dataloader(args.dataset, return_depth=args.use_depth)
-
-    if args.use_depth:
-        netG = ResnetGeneratorDepth128(
-            num_classes=num_classes, output_dim=3).cuda()
-    else:
-        netG = ResnetGenerator128(num_classes=num_classes, output_dim=3).cuda()
-
-    if not os.path.isfile(args.model_path):
-        print('Model not found')
-        raise FileNotFoundError('Model not found')
-
-    state_dict = torch.load(args.model_path)
-
-    new_state_dict = OrderedDict()
-    for k, v in state_dict.items():
-        name = k[7:]  # remove `module.`nvidia
-        new_state_dict[name] = v
-
-    model_dict = netG.state_dict()
-    pretrained_dict = {k: v for k,
-                       v in new_state_dict.items() if k in model_dict}
-    model_dict.update(pretrained_dict)
-    netG.load_state_dict(model_dict)
-
-    netG.cuda()
-    netG.eval()
-
-    if not os.path.exists(args.sample_path):
-        os.makedirs(args.sample_path)
+    if not os.path.exists(sample_path):
+        os.makedirs(sample_path)
     thres = 2.0
 
     for idx, data in tqdm(enumerate(dataloader)):
@@ -87,6 +93,59 @@ def main(args):
 
         imsave(
             "{save_path}/sample_{idx}.jpg".format(save_path=args.sample_path, idx=idx), result)
+
+
+def main(args):
+    num_classes, num_obj = get_num_classes_and_objects(args.dataset)
+
+    # output directory samples/dataset-model_name
+    args.sample_path = os.path.join(
+        args.sample_path, args.dataset + '-' + args.model)
+
+    # get test dataset
+    dataset = get_dataset(args.dataset, None, 'test',
+                          return_depth=args.use_depth)
+
+    # load model
+    if args.use_depth:
+        netG = ResnetGeneratorDepth128(
+            num_classes=num_classes, output_dim=3).cuda()
+    else:
+        netG = ResnetGenerator128(num_classes=num_classes, output_dim=3).cuda()
+
+    if not os.path.isfile(args.model_path):
+        print('Model not found')
+        raise FileNotFoundError('Model not found')
+
+    state_dict = torch.load(args.model_path)
+
+    new_state_dict = OrderedDict()
+    for k, v in state_dict.items():
+        name = k[7:]  # remove `module.`nvidia
+        new_state_dict[name] = v
+
+    model_dict = netG.state_dict()
+    pretrained_dict = {k: v for k,
+                       v in new_state_dict.items() if k in model_dict}
+    model_dict.update(pretrained_dict)
+    netG.load_state_dict(model_dict)
+
+    netG.cuda()
+    netG.eval()
+
+    # Sample fake images
+    print(f'Sampling {len(dataset)} fake images')
+    sample_test(netG, dataset, num_obj, args.sample_path)
+
+    # compute metrics
+    print('Computing metrics')
+    fid, is_ = compute_metrics(dataset.image_dir, args.sample_path, 50, os.cpu_count())
+
+    print(f'FID: {fid}, IS: {is_}')
+
+    # clean
+    print('Cleaning')
+    shutil.rmtree(args.sample_path)
 
 
 if __name__ == "__main__":
