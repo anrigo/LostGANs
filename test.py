@@ -18,8 +18,7 @@ from torchmetrics.image.inception import InceptionScore
 def get_image_path_loader(path, batch_size, num_workers):
     files = get_image_files_in_path(path)
 
-    dataset = ImagePathDataset(files, transforms=TF.Resize(
-        (299, 299)))  # resize to 299x299 as in original paper
+    dataset = ImagePathDataset(files)
     dataloader = torch.utils.data.DataLoader(dataset,
                                              batch_size=batch_size,
                                              shuffle=False,
