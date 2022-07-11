@@ -56,6 +56,7 @@ def compute_metrics(real_path, fake_path, batch_size, num_workers, device='cuda'
 
 def sample_test(netG, dataset, num_obj, sample_path):
     '''Samples images from the model using the provided split layouts and saves them in sample_path'''
+    netG.eval()
 
     dataloader = torch.utils.data.DataLoader(
         dataset, batch_size=1,
@@ -67,7 +68,7 @@ def sample_test(netG, dataset, num_obj, sample_path):
 
     for idx, data in tqdm(enumerate(dataloader)):
 
-        if args.use_depth:
+        if dataset.return_depth:
             real_images, label, bbox, depths = data
             depths = depths.cuda()
         else:
@@ -79,7 +80,7 @@ def sample_test(netG, dataset, num_obj, sample_path):
         z_im = torch.from_numpy(truncted_random(
             num_o=1, thres=thres)).view(1, -1).float().cuda()
 
-        if args.use_depth:
+        if dataset.return_depth:
             fake_images = netG.forward(
                 z_obj, bbox.cuda(), z_im=z_im, y=label.squeeze(dim=-1), depths=depths)
         else:
@@ -91,7 +92,7 @@ def sample_test(netG, dataset, num_obj, sample_path):
             1, 2, 0) + 1) / 2 * 255).type(torch.uint8).cpu().numpy()
 
         imsave(
-            "{save_path}/sample_{idx}.jpg".format(save_path=args.sample_path, idx=idx), result)
+            "{save_path}/sample_{idx}.jpg".format(save_path=sample_path, idx=idx), result)
 
 
 def main(args):

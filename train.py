@@ -1,10 +1,12 @@
 import argparse
 import os
+import shutil
 import time
 import datetime
 import torch
 import torch.nn as nn
 from torchvision.utils import make_grid, draw_bounding_boxes
+from test import compute_metrics, sample_test
 from utils.util import *
 from data.cocostuff_loader import *
 from data.vg import *
@@ -49,6 +51,9 @@ def main(args):
     # output directory
     args.out_path = os.path.join(
         args.out_path, args.dataset + '-' + args.model)
+    
+    # output directory samples/dataset-model_name
+    sample_path = os.path.join('samples', args.dataset + '-' + args.model)
 
     # log config
     wandb.init(
@@ -69,6 +74,9 @@ def main(args):
 
     # data loader
     train_data = get_dataset(args.dataset, img_size, mode='train',
+                             return_depth=args.use_depth)
+
+    val_data = get_dataset(args.dataset, img_size, mode='val',
                              return_depth=args.use_depth)
 
     dataloader = torch.utils.data.DataLoader(
@@ -271,6 +279,15 @@ def main(args):
                         "depth_results": wandb.Image(depth_grid)
                     })
 
+                # compute metrics on validation set
+                sample_test(netG, val_data, num_obj, sample_path)
+                fid, is_ = compute_metrics(val_data.image_dir, sample_path, 50, os.cpu_count())
+                print(f'FID: {fid}, IS: {is_}')
+                shutil.rmtree(sample_path)
+
+                wandb.log({"val_fid": fid, "val_is": is_})
+
+
         # save model
         if (epoch + 1) % 5 == 0:
             torch.save(netG.state_dict(), os.path.join(
@@ -300,9 +317,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # train params
-    # args.dataset = 'clevr'
+    # args.dataset = 'clevr-occs'
     # args.batch_size = 6
     # args.use_depth = True
-    # args.model_name = 'depth-latent'
+    # args.model = 'test'
 
     main(args)
