@@ -286,14 +286,14 @@ def main(args):
                         "depth_results": wandb.Image(depth_grid)
                     })
 
-            if epoch % val_every == 0:
-                # compute metrics on validation set
-                sample_test(netG, val_data, num_obj, sample_path)
-                fid, is_ = compute_metrics(val_data.image_dir, sample_path, 50, os.cpu_count())
-                print(f'FID: {fid}, IS: {is_}')
-                shutil.rmtree(sample_path)
+        if epoch % val_every == 0:
+            # compute metrics on validation set
+            sample_test(netG, val_data, num_obj, sample_path)
+            fid, is_ = compute_metrics(val_data.image_dir, sample_path, 50, os.cpu_count())
+            print(f'FID: {fid}, IS: {is_}')
+            shutil.rmtree(sample_path)
 
-                wandb.log({"val_fid": fid, "val_is": is_})
+            wandb.log({"val_fid": fid, "val_is": is_})
 
 
         # save model
