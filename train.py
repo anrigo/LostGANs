@@ -137,7 +137,11 @@ def main(args):
     vgg_loss = nn.DataParallel(vgg_loss)
     l1_loss = nn.DataParallel(nn.L1Loss())
 
-    val_every = floor(len(dataloader)/3) if len(dataloader) < 500 else 500
+    # log fake images and loss every n iterations, about 10 times per epoch
+    log_every = floor(len(dataloader)/10) if len(dataloader) < 500 else 500
+    
+    # validate and log metrics every n epochs
+    val_every = 1
 
     for epoch in range(args.total_epoch):
         netG.train()
@@ -217,7 +221,7 @@ def main(args):
 
                 print(f"Epoch: {epoch+1}, d_loss: {g_loss}")
 
-            if (idx+1) % val_every == 0:
+            if (idx+1) % log_every == 0:
                 elapsed = time.time() - start_time
                 elapsed = str(datetime.timedelta(seconds=elapsed))
                 logger.info("Time Elapsed: [{}]".format(elapsed))
@@ -282,6 +286,7 @@ def main(args):
                         "depth_results": wandb.Image(depth_grid)
                     })
 
+            if epoch % val_every == 0:
                 # compute metrics on validation set
                 sample_test(netG, val_data, num_obj, sample_path)
                 fid, is_ = compute_metrics(val_data.image_dir, sample_path, 50, os.cpu_count())
