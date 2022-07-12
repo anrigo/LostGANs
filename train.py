@@ -1,4 +1,5 @@
 import argparse
+from math import floor
 import os
 import shutil
 import time
@@ -136,6 +137,8 @@ def main(args):
     vgg_loss = nn.DataParallel(vgg_loss)
     l1_loss = nn.DataParallel(nn.L1Loss())
 
+    val_every = floor(len(dataloader)/3) if len(dataloader) < 500 else 500
+
     for epoch in range(args.total_epoch):
         netG.train()
         netD.train()
@@ -214,7 +217,7 @@ def main(args):
 
                 print(f"Epoch: {epoch+1}, d_loss: {g_loss}")
 
-            if (idx+1) % 500 == 0:
+            if (idx+1) % val_every == 0:
                 elapsed = time.time() - start_time
                 elapsed = str(datetime.timedelta(seconds=elapsed))
                 logger.info("Time Elapsed: [{}]".format(elapsed))
