@@ -138,7 +138,7 @@ def main(args):
     l1_loss = nn.DataParallel(nn.L1Loss())
 
     # log fake images and loss every n iterations, about 10 times per epoch
-    log_every = floor(len(dataloader)/10) if len(dataloader) < 500 else 500
+    log_every = floor(len(dataloader)/10)
     
     # validate and log metrics every n epochs
     val_every = 1
