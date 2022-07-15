@@ -20,22 +20,6 @@ import utils.depth as udpt
 import wandb
 
 
-# def get_dataset(dataset, img_size, num_obj=10):
-#     if dataset == "coco":
-#         data = CocoSceneGraphDataset(image_dir='./datasets/coco/images/train2017/',
-#                                         instances_json='./datasets/coco/annotations/instances_train2017.json',
-#                                         stuff_json='./datasets/coco/annotations/stuff_train2017.json',
-#                                         stuff_only=True, image_size=(img_size, img_size), left_right_flip=True)
-#     elif dataset == 'vg':
-#         with open('./datasets/vg/vocab.json', 'r') as fj:
-#             vocab = json.load(fj)
-
-#         data = VgSceneGraphDataset(vocab=vocab, h5_path='./datasets/vg/train.h5',
-#                                     image_dir='./datasets/vg/images/',
-#                                     image_size=(img_size, img_size), max_objects=num_obj, left_right_flip=True)
-#     return data
-
-
 def main(args):
 
     # parameters
@@ -72,6 +56,12 @@ def main(args):
         # mode='disabled'
     )
     wandb.config.update(args)
+
+    # log fake images and loss every n iterations, about 10 times per epoch
+    log_every = floor(len(dataloader)/10)
+    
+    # validate and log metrics every n epochs
+    val_every = 1
 
     # data loader
     train_data = get_dataset(args.dataset, img_size, mode='train',
@@ -137,11 +127,6 @@ def main(args):
     vgg_loss = nn.DataParallel(vgg_loss)
     l1_loss = nn.DataParallel(nn.L1Loss())
 
-    # log fake images and loss every n iterations, about 10 times per epoch
-    log_every = floor(len(dataloader)/10)
-    
-    # validate and log metrics every n epochs
-    val_every = 1
 
     for epoch in range(args.total_epoch):
         netG.train()
@@ -216,7 +201,9 @@ def main(args):
                     "g_loss_obj": g_loss_obj.item(),
                     "g_loss": g_loss.item(),
                     "pixel_loss": pixel_loss.item(),
-                    "feat_loss": feat_loss.item()
+                    "feat_loss": feat_loss.item(),
+                    "g_lr": g_optimizer.param_groups[0]['lr'],
+                    "d_lr": d_optimizer.param_groups[0]['lr']
                 })
 
                 print(f"Epoch: {epoch+1}, d_loss: {g_loss}")
@@ -240,6 +227,16 @@ def main(args):
                 logger.info("             pixel_loss: {:.4f}, feat_loss: {:.4f}".format(
                     pixel_loss.item(), feat_loss.item())
                 )
+
+                # log image ranges
+                wandb.log({
+                    "fake_max": fake_images.max().item(),
+                    "fake_min": fake_images.min().item(),
+                    "fake_mean": fake_images.mean().item(),
+                    "real_max": real_images.max().item(),
+                    "real_min": real_images.min().item(),
+                    "real_mean": real_images.mean().item()
+                })
 
                 # put images in a grid tensor
                 # all images are in [-1,1]
@@ -289,11 +286,11 @@ def main(args):
         if epoch % val_every == 0:
             # compute metrics on validation set
             sample_test(netG, val_data, num_obj, sample_path)
-            fid, is_ = compute_metrics(val_data.image_dir, sample_path, 50, os.cpu_count())
+            fid, is_, lpips = compute_metrics(val_data.image_dir, sample_path, 50, os.cpu_count())
             print(f'FID: {fid}, IS: {is_}')
             shutil.rmtree(sample_path)
 
-            wandb.log({"val_fid": fid, "val_is": is_})
+            wandb.log({"val_fid": fid, "val_is": is_, "lpips": lpips})
 
 
         # save model
