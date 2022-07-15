@@ -3,6 +3,7 @@ from collections import OrderedDict
 import shutil
 # from scipy import misc
 from imageio import imsave
+from matplotlib import pyplot as plt
 import torch
 from tqdm import tqdm
 from data.cocostuff_loader import *
@@ -13,6 +14,7 @@ import torchvision.transforms as TF
 from data.datasets import ImagePathDataset, get_dataset, get_image_files_in_path, get_num_classes_and_objects
 from torchmetrics.image.fid import FrechetInceptionDistance
 from torchmetrics.image.inception import InceptionScore
+from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity
 
 
 def get_image_path_loader(path, batch_size, num_workers):
@@ -37,8 +39,24 @@ def compute_metrics(real_path, fake_path, batch_size, num_workers, device='cuda'
     fake_dataloader = get_image_path_loader(
         fake_path, 50, os.cpu_count())
 
+    # get files in the same order
+    l_alt = get_image_files_in_path(Path(fake_path, 'alt'))
+    l_fake = [Path(p.parents[1], p.name) for p in l_alt]
+
+    fake_ds = ImagePathDataset(l_fake)
+    alt_ds = ImagePathDataset(l_alt)
+
     fid = FrechetInceptionDistance(feature=2048).to(device)
     inception = InceptionScore().to(device)
+    lpips = LearnedPerceptualImagePatchSimilarity(net_type='vgg')
+
+    # compute lpips on pairs of images generated from the same layout
+    for imgs in tqdm(zip(fake_ds, alt_ds)):
+        fake, alt = imgs
+
+        # normalize from [0,255] to [-1,1] as required by the metric
+        fake, alt = ((fake/255*2)-1).unsqueeze(0), ((alt/255*2)-1).unsqueeze(0)
+        lpips.update(fake, alt)
 
     for batch in tqdm(real_dataloader):
         batch = batch.to(device)
@@ -51,10 +69,10 @@ def compute_metrics(real_path, fake_path, batch_size, num_workers, device='cuda'
         fid.update(batch, real=False)
         inception.update(batch)
 
-    return fid.compute(), inception.compute()[0]
+    return fid.compute(), inception.compute()[0], lpips.compute()
 
 
-def sample_test(netG, dataset, num_obj, sample_path):
+def sample_test(netG, dataset, num_obj, sample_path, lpips_samples=100):
     '''Samples images from the model using the provided split layouts and saves them in sample_path'''
     netG.eval()
 
@@ -62,8 +80,10 @@ def sample_test(netG, dataset, num_obj, sample_path):
         dataset, batch_size=1,
         drop_last=True, shuffle=False, num_workers=1)
 
-    if not os.path.exists(sample_path):
-        os.makedirs(sample_path)
+    alt_path = Path(sample_path, 'alt')
+
+    if not alt_path.is_dir():
+        os.makedirs(alt_path)
     thres = 2.0
 
     for idx, data in tqdm(enumerate(dataloader)):
@@ -80,12 +100,29 @@ def sample_test(netG, dataset, num_obj, sample_path):
         z_im = torch.from_numpy(truncted_random(
             num_o=1, thres=thres)).view(1, -1).float().cuda()
 
+        z_obj_alt = torch.from_numpy(truncted_random(
+            num_o=num_obj, thres=thres)).float().cuda()
+        z_im_alt = torch.from_numpy(truncted_random(
+            num_o=1, thres=thres)).view(1, -1).float().cuda()
+
         if dataset.return_depth:
             fake_images = netG.forward(
                 z_obj, bbox.cuda(), z_im=z_im, y=label.squeeze(dim=-1), depths=depths)
+
+            if lpips_samples >= 0:
+                # generate different image from the same layout
+                fake_images_alt = netG.forward(
+                    z_obj_alt, bbox.cuda(), z_im=z_im_alt, y=label.squeeze(dim=-1), depths=depths)
+                lpips_samples -= 1
         else:
             fake_images = netG.forward(
                 z_obj, bbox.cuda(), z_im, label.squeeze(dim=-1))
+
+            if lpips_samples >= 0:
+                # generate different image from the same layout
+                fake_images_alt = netG.forward(
+                    z_obj_alt, bbox.cuda(), z_im_alt, label.squeeze(dim=-1))
+                lpips_samples -= 1
 
         # normalize from [-1,1] to [0,255]
         result = ((fake_images[0].detach().permute(
@@ -93,6 +130,16 @@ def sample_test(netG, dataset, num_obj, sample_path):
 
         imsave(
             "{save_path}/sample_{idx}.jpg".format(save_path=sample_path, idx=idx), result)
+
+        if lpips_samples >= 0:
+            # save the alternative image
+
+            # normalize from [-1,1] to [0,255]
+            result_alt = ((fake_images_alt[0].detach().permute(
+                1, 2, 0) + 1) / 2 * 255).type(torch.uint8).cpu().numpy()
+
+            imsave(
+                "{save_path}/sample_{idx}.jpg".format(save_path=alt_path, idx=idx), result_alt)
 
 
 def main(args):
@@ -139,9 +186,10 @@ def main(args):
 
     # compute metrics
     print('Computing metrics')
-    fid, is_ = compute_metrics(dataset.image_dir, args.sample_path, 50, os.cpu_count())
+    fid, is_, lpips = compute_metrics(
+        dataset.image_dir, args.sample_path, 50, os.cpu_count())
 
-    print(f'FID: {fid}, IS: {is_}')
+    print(f'FID: {fid}, IS: {is_}, LPIPS: {lpips}')
 
     # clean
     print('Cleaning')
@@ -161,4 +209,10 @@ if __name__ == "__main__":
     parser.add_argument('--model', type=str, default='baseline',
                         help='short model name')
     args = parser.parse_args()
+
+    args.dataset = 'clevr-occs'
+    args.model_path ='outputs/clevr-occs-depth-latent/G_200.pth'
+    args.use_depth = True
+    args.model = 'depth-latent'
+
     main(args)
