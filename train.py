@@ -57,12 +57,6 @@ def main(args):
     )
     wandb.config.update(args)
 
-    # log fake images and loss every n iterations, about 10 times per epoch
-    log_every = floor(len(dataloader)/10)
-    
-    # validate and log metrics every n epochs
-    val_every = 1
-
     # data loader
     train_data = get_dataset(args.dataset, img_size, mode='train',
                              return_depth=args.use_depth)
@@ -73,6 +67,12 @@ def main(args):
     dataloader = torch.utils.data.DataLoader(
         train_data, batch_size=args.batch_size,
         drop_last=True, shuffle=True, num_workers=8)
+
+    # log fake images and loss every n iterations, about 10 times per epoch
+    log_every = floor(len(dataloader)/10)
+    
+    # validate and log metrics every n epochs
+    val_every = 1
 
     # Load model
     if args.use_depth:
