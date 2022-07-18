@@ -34,6 +34,9 @@ def get_dataset(dataset: str, img_size: int, mode: str = None, depth_dir: Union[
     clevr_occs_image_dir = f'./datasets/CLEVR_occlusions/images/{mode}'
     clevr_occs_scenes_json = f'./datasets/CLEVR_occlusions/scenes/CLEVR_{mode}_scenes.json'
 
+    clevr_occs2_image_dir = f'./datasets/CLEVR_occlusions2/images/{mode}'
+    clevr_occs2_scenes_json = f'./datasets/CLEVR_occlusions2/scenes/CLEVR_{mode}_scenes.json'
+
     if depth_dir is None:
         depth_dir = Path('datasets', f'{dataset}-depth', mode)
 
@@ -61,6 +64,10 @@ def get_dataset(dataset: str, img_size: int, mode: str = None, depth_dir: Union[
     elif dataset == 'clevr-occs':
         data = CLEVRDataset(image_dir=clevr_occs_image_dir,
                             scenes_json=clevr_occs_scenes_json,
+                            image_size=(img_size, img_size), return_depth=return_depth, occlusions=True)
+    elif dataset == 'clevr-occs2':
+        data = CLEVRDataset(image_dir=clevr_occs2_image_dir,
+                            scenes_json=clevr_occs2_scenes_json,
                             image_size=(img_size, img_size), return_depth=return_depth, occlusions=True)
 
     return data
