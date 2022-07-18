@@ -79,7 +79,8 @@ def get_num_classes_and_objects(dataset: str) -> tuple[int, int]:
         'coco': (184, 8),
         'vg': (179, 31),
         'clevr': (97, 10),
-        'clevr-occs': (4, 10)
+        'clevr-occs': (4, 10),
+        'clevr-occs2': (4, 10)
     }[dataset]
 
 
