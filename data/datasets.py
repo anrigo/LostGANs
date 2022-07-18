@@ -64,10 +64,12 @@ def get_dataset(dataset: str, img_size: int, mode: str = None, depth_dir: Union[
     elif dataset == 'clevr-occs':
         data = CLEVRDataset(image_dir=clevr_occs_image_dir,
                             scenes_json=clevr_occs_scenes_json,
+                            max_objects_per_image=num_obj,
                             image_size=(img_size, img_size), return_depth=return_depth, occlusions=True)
     elif dataset == 'clevr-occs2':
         data = CLEVRDataset(image_dir=clevr_occs2_image_dir,
                             scenes_json=clevr_occs2_scenes_json,
+                            max_objects_per_image=num_obj,
                             image_size=(img_size, img_size), return_depth=return_depth, occlusions=True)
 
     return data

@@ -151,6 +151,7 @@ def main(args):
 
     # get test dataset
     dataset = get_dataset(args.dataset, None, 'test',
+                          num_obj=num_obj,
                           return_depth=args.use_depth)
 
     # load model
@@ -211,7 +212,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     args.dataset = 'clevr-occs'
-    args.model_path ='outputs/clevr-occs-depth-latent/G_200.pth'
+    args.model_path = 'outputs/clevr-occs-depth-latent/G_200.pth'
     args.use_depth = True
     args.model = 'depth-latent'
 

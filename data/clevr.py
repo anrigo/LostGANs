@@ -26,7 +26,7 @@ class CLEVRDataset(Dataset):
             # 97 classes, size + color + material + shape
             self.idx2label = generate_label_map()
 
-        # Each scene contains between 3 and 10 random objects
+        # Each scene contains between 3 and 10 random objects (in the original clevr)
         self.max_objects_per_image = max_objects_per_image
 
         # compose transforms to resize and convert to tensor

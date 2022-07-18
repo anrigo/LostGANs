@@ -36,7 +36,7 @@ def main(args):
     # output directory
     args.out_path = os.path.join(
         args.out_path, args.dataset + '-' + args.model)
-    
+
     # output directory samples/dataset-model_name
     sample_path = os.path.join('samples', args.dataset + '-' + args.model)
 
@@ -59,10 +59,12 @@ def main(args):
 
     # data loader
     train_data = get_dataset(args.dataset, img_size, mode='train',
+                             num_obj=num_obj,
                              return_depth=args.use_depth)
 
     val_data = get_dataset(args.dataset, img_size, mode='val',
-                             return_depth=args.use_depth)
+                           num_obj=num_obj,
+                           return_depth=args.use_depth)
 
     dataloader = torch.utils.data.DataLoader(
         train_data, batch_size=args.batch_size,
@@ -70,7 +72,7 @@ def main(args):
 
     # log fake images and loss every n iterations, about 10 times per epoch
     log_every = floor(len(dataloader)/10)
-    
+
     # validate and log metrics every n epochs
     val_every = 1
 
@@ -126,7 +128,6 @@ def main(args):
     vgg_loss = VGGLoss()
     vgg_loss = nn.DataParallel(vgg_loss)
     l1_loss = nn.DataParallel(nn.L1Loss())
-
 
     for epoch in range(args.total_epoch):
         netG.train()
@@ -286,12 +287,12 @@ def main(args):
         if epoch % val_every == 0:
             # compute metrics on validation set
             sample_test(netG, val_data, num_obj, sample_path)
-            fid, is_, lpips = compute_metrics(val_data.image_dir, sample_path, 50, os.cpu_count())
+            fid, is_, lpips = compute_metrics(
+                val_data.image_dir, sample_path, 50, os.cpu_count())
             print(f'FID: {fid}, IS: {is_}')
             shutil.rmtree(sample_path)
 
             wandb.log({"val_fid": fid, "val_is": is_, "lpips": lpips})
-
 
         # save model
         if (epoch + 1) % 5 == 0:
@@ -322,7 +323,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # train params
-    # args.dataset = 'clevr-occs'
+    # args.dataset = 'clevr-occs2'
     # args.batch_size = 6
     # args.use_depth = True
     # args.model = 'test'
