@@ -150,7 +150,7 @@ def main(args):
         args.sample_path, args.dataset + '-' + args.model)
 
     # get test dataset
-    dataset = get_dataset(args.dataset, None, 'test',
+    dataset = get_dataset(args.dataset, None, 'val',
                           num_obj=num_obj,
                           return_depth=args.use_depth)
 
@@ -192,9 +192,10 @@ def main(args):
 
     print(f'FID: {fid}, IS: {is_}, LPIPS: {lpips}')
 
-    # clean
-    print('Cleaning')
-    shutil.rmtree(args.sample_path)
+    if not args.keep:
+        # clean
+        print('Cleaning')
+        shutil.rmtree(args.sample_path)
 
 
 if __name__ == "__main__":
@@ -207,13 +208,15 @@ if __name__ == "__main__":
                         help='path to save generated images')
     parser.add_argument('--use_depth', action=argparse.BooleanOptionalAction,
                         default=False, help='use depth information')
+    parser.add_argument('--keep', action=argparse.BooleanOptionalAction,
+                        default=False, help='if true, the sampled images won\'t be deleted')
     parser.add_argument('--model', type=str, default='baseline',
                         help='short model name')
     args = parser.parse_args()
 
-    args.dataset = 'clevr-occs'
-    args.model_path = 'outputs/clevr-occs-depth-latent/G_200.pth'
-    args.use_depth = True
-    args.model = 'depth-latent'
+    # args.dataset = 'clevr-occs'
+    # args.model_path = 'outputs/clevr-occs-depth-latent/G_200.pth'
+    # args.use_depth = True
+    # args.model = 'depth-latent'
 
     main(args)
