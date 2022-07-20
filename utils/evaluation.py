@@ -26,9 +26,9 @@ def compute_metrics(real_path, fake_path, batch_size, num_workers, device='cuda'
 
     # dataloaders for images only, so they are both in the same format
     real_dataloader = get_image_path_loader(
-        real_path, 50, os.cpu_count())
+        real_path, batch_size, num_workers)
     fake_dataloader = get_image_path_loader(
-        fake_path, 50, os.cpu_count())
+        fake_path, batch_size, num_workers)
 
     # get files in the same order
     l_alt = get_image_files_in_path(Path(fake_path, 'alt'))
