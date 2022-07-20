@@ -288,12 +288,19 @@ def main(args):
         if epoch % val_every == 0:
             # compute metrics on validation set
             sample_test(netG, val_data, num_obj, sample_path)
-            fid, is_, lpips = compute_metrics(
+            fid, is_, lpips, cfid, prdc = compute_metrics(
                 val_data.image_dir, sample_path, 50, os.cpu_count())
-            print(f'FID: {fid}, IS: {is_}')
+            print(f'FID: {fid}, IS: {is_}, Clean FID: {cfid}')
+            print(prdc)
             shutil.rmtree(sample_path)
 
-            wandb.log({"val_fid": fid, "val_is": is_, "lpips": lpips})
+            wandb.log({
+                "val_fid": fid,
+                "val_is": is_,
+                "lpips": lpips,
+                "clean_fid": cfid,
+            })
+            wandb.log(prdc)
 
         # save model
         if (epoch + 1) % 5 == 0:

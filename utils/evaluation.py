@@ -69,7 +69,7 @@ def compute_metrics(real_path, fake_path, batch_size, num_workers, device='cuda'
 
     print('Computing Clean FID and PRDC')
     # compute clean FID
-    cfid, np_real_feats, np_fake_feats = cleanfid_compute_fid_return_feat(real_path, fake_path)
+    cfid, np_real_feats, np_fake_feats = cleanfid_compute_fid_return_feat(real_path, fake_path, batch_size=batch_size, num_workers=num_workers)
 
     # compute k-NN based precision precision, recall, density, and coverage
     prdc = compute_prdc(np_real_feats, np_fake_feats)
