@@ -123,14 +123,15 @@ def main(args):
 
     # Sample fake images
     print(f'Sampling {len(dataset)} fake images')
-    sample_test(netG, dataset, num_obj, args.sample_path)
+    # sample_test(netG, dataset, num_obj, args.sample_path)
 
     # compute metrics
     print('Computing metrics')
-    fid, is_, lpips = compute_metrics(
+    fid, is_, lpips, cfid, prdc = compute_metrics(
         dataset.image_dir, args.sample_path, 50, os.cpu_count())
 
-    print(f'FID: {fid}, IS: {is_}, LPIPS: {lpips}')
+    print(f'FID: {fid}, IS: {is_}, LPIPS: {lpips}, Clean FID: {cfid}')
+    print(prdc)
 
     if not args.keep:
         # clean
