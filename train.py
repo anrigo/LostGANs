@@ -7,7 +7,8 @@ import datetime
 import torch
 import torch.nn as nn
 from torchvision.utils import make_grid, draw_bounding_boxes
-from test import compute_metrics, sample_test
+from test import sample_test
+from utils.evaluation import compute_metrics
 from utils.util import *
 from data.cocostuff_loader import *
 from data.vg import *
