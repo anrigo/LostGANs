@@ -1,7 +1,9 @@
 import json
 from pathlib import Path
 from typing import Union
-
+import os
+from torchvision.io import read_image
+from torch.utils.data import Dataset
 import numpy as np
 from data.clevr import CLEVRDataset
 from data.cocostuff_loader import CocoSceneGraphDataset
@@ -86,7 +88,7 @@ def get_num_classes_and_objects(dataset: str) -> tuple[int, int]:
     }[dataset]
 
 
-class ImagePathDataset(torch.utils.data.Dataset):
+class ImagePathDataset(Dataset):
     def __init__(self, files, transforms=None):
         self.files = files
         self.transforms = transforms
@@ -105,6 +107,22 @@ class ImagePathDataset(torch.utils.data.Dataset):
         img = torch.permute(img, (2, 0, 1))
 
         return img
+
+
+class DirDataset(Dataset):
+    def __init__(self, img_dir):
+        self.img_dir = img_dir
+        self.file_names = os.listdir(img_dir)
+        self.file_names = [filename for filename in self.file_names if Path(
+            self.img_dir, filename).is_file()]
+
+    def __len__(self):
+        return len(self.file_names)
+
+    def __getitem__(self, idx):
+        img_path = os.path.join(self.img_dir, self.file_names[idx])
+        image = read_image(img_path)
+        return image
 
 
 def get_image_files_in_path(path: Union[str, Path]) -> list[Path]:
