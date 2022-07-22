@@ -22,7 +22,6 @@ import wandb
 
 
 def main(args):
-
     # parameters
     img_size = 128
     z_dim = 128
@@ -75,7 +74,7 @@ def main(args):
     log_every = floor(len(dataloader)/10)
 
     # validate and log metrics every n epochs
-    val_every = 1
+    val_every = 3
 
     # Load model
     if args.use_depth:
@@ -285,7 +284,7 @@ def main(args):
                         "depth_results": wandb.Image(depth_grid)
                     })
 
-        if epoch % val_every == 0:
+        if epoch % val_every == 0 or epoch == args.total_epoch - 1:
             # compute metrics on validation set
             sample_test(netG, val_data, num_obj, sample_path)
             fid, is_, lpips, cfid, prdc = compute_metrics(
