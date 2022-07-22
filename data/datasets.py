@@ -39,6 +39,9 @@ def get_dataset(dataset: str, img_size: int, mode: str = None, depth_dir: Union[
     clevr_occs2_image_dir = f'./datasets/CLEVR_occlusions2/images/{mode}'
     clevr_occs2_scenes_json = f'./datasets/CLEVR_occlusions2/scenes/CLEVR_{mode}_scenes.json'
 
+    clevr_rubber_image_dir = f'./datasets/CLEVR_rubber/images/{mode}'
+    clevr_rubber_scenes_json = f'./datasets/CLEVR_rubber/scenes/CLEVR_{mode}_scenes.json'
+
     if depth_dir is None:
         depth_dir = Path('datasets', f'{dataset}-depth', mode)
 
@@ -73,6 +76,11 @@ def get_dataset(dataset: str, img_size: int, mode: str = None, depth_dir: Union[
                             scenes_json=clevr_occs2_scenes_json,
                             max_objects_per_image=num_obj,
                             image_size=(img_size, img_size), return_depth=return_depth, occlusions=True)
+    elif dataset == 'clevr-rubber':
+        data = CLEVRDataset(image_dir=clevr_rubber_image_dir,
+                            scenes_json=clevr_rubber_scenes_json,
+                            max_objects_per_image=num_obj,
+                            image_size=(img_size, img_size), return_depth=return_depth, occlusions=True)
 
     return data
 
@@ -84,7 +92,8 @@ def get_num_classes_and_objects(dataset: str) -> tuple[int, int]:
         'vg': (179, 31),
         'clevr': (97, 10),
         'clevr-occs': (4, 10),
-        'clevr-occs2': (4, 20)
+        'clevr-occs2': (4, 20),
+        'clevr-rubber': (4, 20)
     }[dataset]
 
 

@@ -330,7 +330,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # train params
-    # args.dataset = 'clevr-occs2'
+    # args.dataset = 'clevr-rubber'
     # args.batch_size = 6
     # args.use_depth = True
     # args.model = 'test'
