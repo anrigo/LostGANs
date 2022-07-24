@@ -1,3 +1,4 @@
+import platform
 import numpy as np
 import torch
 import os
@@ -14,6 +15,8 @@ from torch.utils.data import DataLoader
 from sklearn.neighbors import NearestNeighbors
 from torchvision.utils import make_grid
 from torchvision.transforms import Resize
+from cleanfid.inception_pytorch import InceptionV3
+from cleanfid.inception_torchscript import InceptionV3W
 
 
 def get_image_path_loader(path, batch_size, num_workers):
@@ -78,16 +81,31 @@ def compute_metrics(real_path, fake_path, batch_size, num_workers, device='cuda'
         real_path, fake_path, batch_size=batch_size, num_workers=num_workers)
 
     # compute k-NN based precision precision, recall, density, and coverage
-    prdc = compute_prdc(np_real_feats, np_fake_feats)
+    prdc = compute_prdc(np_real_feats, np_fake_feats, 10)
 
     return fid.compute(), inception.compute()[0], lpips.compute(), cfid, prdc
+
+
+"""
+returns a functions that takes an image in range [0,255]
+and outputs a feature embedding vector
+"""
+def build_clean_fid_feature_extractor(name="torchscript_inception", device=torch.device("cuda"), resize_inside=False):
+    path = '~/.cache/torch/hub/checkpoints/'
+    if not Path(path, 'inception-2015-12-05.pt').is_file():
+        path = "./" if platform.system() == "Windows" else "/tmp"
+
+    model = InceptionV3W(path, download=True, resize_inside=resize_inside).to(device)
+    model.eval()
+    def model_fn(x): return model(x)
+    return model_fn
 
 
 def cleanfid_compute_fid_return_feat(fdir1, fdir2, mode='clean', num_workers=0,
                                      batch_size=8, device=torch.device("cuda"), verbose=True,
                                      custom_image_tranform=None):
 
-    feat_model = clean_fid.build_feature_extractor(mode, device)
+    feat_model = build_clean_fid_feature_extractor(mode, device)
 
     # get all inception features for the first folder
     fbname1 = os.path.basename(fdir1)
