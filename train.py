@@ -207,7 +207,7 @@ def main(args):
                     "d_lr": d_optimizer.param_groups[0]['lr']
                 })
 
-                print(f"Epoch: {epoch+1}, d_loss: {g_loss}")
+                print(f"Epoch: {epoch+1}, g_loss: {g_loss}")
 
             if (idx+1) % log_every == 0:
                 elapsed = time.time() - start_time
