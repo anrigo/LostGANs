@@ -291,6 +291,7 @@ def main(args):
                 val_data.image_dir, sample_path, 50, os.cpu_count())
             shutil.rmtree(sample_path)
 
+            print(metrics_dict)
             wandb.log(metrics_dict)
 
         # save model
