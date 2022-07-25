@@ -2,6 +2,7 @@ import platform
 import numpy as np
 import torch
 import os
+import torch_fidelity
 import sklearn.metrics
 import cleanfid.fid as clean_fid
 from tqdm import tqdm
@@ -32,14 +33,8 @@ def get_image_path_loader(path, batch_size, num_workers):
     return dataloader
 
 
-def compute_metrics(real_path, fake_path, batch_size, num_workers, device='cuda'):
+def compute_metrics(real_path, fake_path, batch_size, num_workers, device=torch.device('cuda')):
     '''Given two paths to real and fake images, computes metrics on them'''
-
-    # dataloaders for images only, so they are both in the same format
-    real_dataloader = get_image_path_loader(
-        real_path, batch_size, num_workers)
-    fake_dataloader = get_image_path_loader(
-        fake_path, batch_size, num_workers)
 
     # get files in the same order
     l_alt = get_image_files_in_path(Path(fake_path, 'alt'))
@@ -48,42 +43,44 @@ def compute_metrics(real_path, fake_path, batch_size, num_workers, device='cuda'
     fake_ds = ImagePathDataset(l_fake)
     alt_ds = ImagePathDataset(l_alt)
 
-    fid = FrechetInceptionDistance(feature=2048).to(device)
-    inception = InceptionScore().to(device)
-    lpips = LearnedPerceptualImagePatchSimilarity(net_type='vgg')
+    print('Computing FID and IS')
+    isc_fid_dict = torch_fidelity.calculate_metrics(
+        input1=fake_path,
+        input2=real_path,
+        cuda=(device.type == 'cuda'),
+        isc=True,
+        fid=True
+    )
+
+    # rename results for easier comparison with previous experiments
+    isc_fid_dict.pop('inception_score_std')
+    isc_fid_dict['val_fid'] = isc_fid_dict.pop('frechet_inception_distance')
+    isc_fid_dict['val_is'] = isc_fid_dict.pop('inception_score_mean')
 
     print('Computing LPIPS')
+    lpips = LearnedPerceptualImagePatchSimilarity(net_type='vgg').to(device)
+    
     # compute lpips on pairs of images generated from the same layout
     for imgs in tqdm(zip(fake_ds, alt_ds)):
         fake, alt = imgs
 
         # normalize from [0,255] to [-1,1] as required by the metric
-        fake, alt = ((fake/255*2)-1).unsqueeze(0), ((alt/255*2)-1).unsqueeze(0)
+        fake, alt = ((fake.to(device)/255*2)-1).unsqueeze(0), ((alt.to(device)/255*2)-1).unsqueeze(0)
         lpips.update(fake, alt)
 
-    print('Computing FID and IS')
-    # iterate over real images and update statistics for FID
-    for batch in tqdm(real_dataloader):
-        batch = batch.to(device)
+    lpips_res = lpips.compute().item()
 
-        fid.update(batch, real=True)
-
-    # iterate over fake images and update statistics for FID and IS
-    for batch in tqdm(fake_dataloader):
-        batch = batch.to(device)
-
-        fid.update(batch, real=False)
-        inception.update(batch)
-
-    print('Computing Clean FID and PRDC')
+    print('Computing Clean FID')
     # compute clean FID
     cfid, np_real_feats, np_fake_feats = cleanfid_compute_fid_return_feat(
-        real_path, fake_path, batch_size=batch_size, num_workers=num_workers)
+        real_path, fake_path, batch_size=batch_size, num_workers=num_workers, device=device)
 
+    print('Computing Precision, Recall, Density and Coverage')
     # compute k-NN based precision precision, recall, density, and coverage
     prdc = compute_prdc(np_real_feats, np_fake_feats, 10)
 
-    return fid.compute(), inception.compute()[0], lpips.compute(), cfid, prdc
+    # merge all results in a single dictionary and return
+    return {**isc_fid_dict, 'lpips': lpips_res, 'clean_fid': cfid, **prdc}
 
 
 """

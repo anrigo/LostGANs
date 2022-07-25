@@ -129,11 +129,10 @@ def main(args):
 
     # compute metrics
     print('Computing metrics')
-    fid, is_, lpips, cfid, prdc = compute_metrics(
+    metrics_dict = compute_metrics(
         dataset.image_dir, args.sample_path, 50, os.cpu_count())
 
-    print(f'FID: {fid}, IS: {is_}, LPIPS: {lpips}, Clean FID: {cfid}')
-    print(prdc)
+    print(f'METRICS: {metrics_dict}')
 
     if not args.keep:
         # clean
