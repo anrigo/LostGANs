@@ -88,10 +88,7 @@ returns a functions that takes an image in range [0,255]
 and outputs a feature embedding vector
 """
 def build_clean_fid_feature_extractor(name="torchscript_inception", device=torch.device("cuda"), resize_inside=False):
-    path = '~/.cache/torch/hub/checkpoints/'
-    if not Path(path, 'inception-2015-12-05.pt').is_file():
-        path = "./" if platform.system() == "Windows" else "/tmp"
-
+    path = 'outputs'
     model = InceptionV3W(path, download=True, resize_inside=resize_inside).to(device)
     model.eval()
     def model_fn(x): return model(x)
