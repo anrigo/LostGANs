@@ -90,10 +90,10 @@ def get_num_classes_and_objects(dataset: str) -> tuple[int, int]:
     return {
         'coco': (184, 8),
         'vg': (179, 31),
-        'clevr': (97, 10),
-        'clevr-occs': (4, 10),
-        'clevr-occs2': (4, 20),
-        'clevr-rubber': (4, 20)
+        'clevr': (25, 10),
+        'clevr-occs': (25, 10),
+        'clevr-occs2': (25, 20),
+        'clevr-rubber': (25, 20)
     }[dataset]
 
 

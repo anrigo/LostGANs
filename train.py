@@ -53,7 +53,7 @@ def main(args):
             'g_lr': args.g_lr,
             'd_lr': args.d_lr
         },
-        # mode='disabled'
+        mode='disabled'
     )
     wandb.config.update(args)
 
