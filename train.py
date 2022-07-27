@@ -53,7 +53,7 @@ def main(args):
             'g_lr': args.g_lr,
             'd_lr': args.d_lr
         },
-        mode='disabled'
+        mode='disabled' if args.dw else None
     )
     wandb.config.update(args)
 
@@ -325,6 +325,8 @@ if __name__ == "__main__":
                         default=False, help='use depth information')
     parser.add_argument('--model', type=str, default='baseline',
                         help='short model name')
+    parser.add_argument('--dw', action=argparse.BooleanOptionalAction,
+                        default=False, help='disable wandb, defaults to False')
     args = parser.parse_args()
 
     # train params
