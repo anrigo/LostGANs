@@ -231,6 +231,7 @@ def main(args):
 
                 # log image ranges
                 wandb.log({
+                    "epoch": epoch+1,
                     "fake_max": fake_images.max().item(),
                     "fake_min": fake_images.min().item(),
                     "fake_mean": fake_images.mean().item(),
@@ -287,8 +288,12 @@ def main(args):
         if epoch % val_every == 0 or epoch == args.total_epoch - 1:
             # compute metrics on validation set
             sample_test(netG, val_data, num_obj, sample_path)
+            
             metrics_dict = compute_metrics(
                 val_data.image_dir, sample_path, 50, os.cpu_count())
+            
+            metrics_dict['epoch'] = epoch+1
+
             shutil.rmtree(sample_path)
 
             print(metrics_dict)
