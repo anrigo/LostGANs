@@ -166,7 +166,7 @@ class ResnetGeneratorDepth128(nn.Module):
 
         # transformer blocks parameters
         num_heads = 1
-        dim_heads = 8
+        dim_heads = 16
 
         self.fc = nn.utils.spectral_norm(nn.Linear(z_dim, 4*4*16*ch))
 
