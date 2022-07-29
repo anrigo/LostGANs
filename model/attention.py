@@ -1,8 +1,7 @@
 import torch
 import torch.functional as F
 from torch import nn, einsum
-from einops import rearrange, repeat, reduce
-from einops_exts import rearrange_many, repeat_many, check_shape
+from einops import rearrange
 from einops_exts.torch import EinopsToAndFrom
 
 
@@ -74,9 +73,9 @@ class Attention(nn.Module):
 
         # add null key / value for classifier free guidance in prior net
 
-        nk, nv = repeat_many(self.null_kv.unbind(dim=-2), 'd -> b 1 d', b=b)
-        k = torch.cat((nk, k), dim=-2)
-        v = torch.cat((nv, v), dim=-2)
+        # nk, nv = repeat_many(self.null_kv.unbind(dim=-2), 'd -> b 1 d', b=b)
+        # k = torch.cat((nk, k), dim=-2)
+        # v = torch.cat((nv, v), dim=-2)
 
         # add text conditioning, if present
 
@@ -122,6 +121,8 @@ class Attention(nn.Module):
 
 
 class TransformerBlock(nn.Module):
+    '''    Trasnformer block with multi-head attention    '''
+
     def __init__(
         self,
         dim,
@@ -132,15 +133,24 @@ class TransformerBlock(nn.Module):
         context_dim=None,
         cosine_sim_attn=False
     ):
+        '''
+        Set parameters:
+        - dim = c
+        - context_dim = 1
+    
+        For:
+            - x of size (b, c, h, w)
+            - context of size (b, c, 1)
+        '''
         super().__init__()
         self.layers = nn.ModuleList([])
 
         for _ in range(depth):
-            self.layers.append(nn.ModuleList([
+            self.layers.append(
                 EinopsToAndFrom('b c h w', 'b (h w) c',
                                 Attention(dim=dim, heads=heads, dim_head=dim_head,
-                                          context_dim=context_dim, cosine_sim_attn=cosine_sim_attn)
-                                )]))
+                                          context_dim=context_dim, cosine_sim_attn=cosine_sim_attn))
+            )
 
     def forward(self, x, context=None):
         for attn in self.layers:

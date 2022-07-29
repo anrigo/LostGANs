@@ -331,8 +331,9 @@ if __name__ == "__main__":
 
     # train params
     # args.dataset = 'clevr-rubber'
-    # args.batch_size = 6
+    # args.batch_size = 8
     # args.use_depth = True
     # args.model = 'test'
+    # args.dw = True
 
     main(args)
