@@ -143,6 +143,6 @@ class TransformerBlock(nn.Module):
                                 )]))
 
     def forward(self, x, context=None):
-        for attn, ff in self.layers:
+        for attn in self.layers:
             x = attn(x, context=context) + x
         return x
