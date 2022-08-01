@@ -164,8 +164,8 @@ class TransformerBlock(nn.Module):
     ):
         '''
         Set parameters:
-        - dim = c
-        - context_dim = 1
+            - dim = c
+            - context_dim = 1
     
         For:
             - x of size (b, c, h, w)
