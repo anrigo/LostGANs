@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import wandb
 from .norm_module import *
 from .mask_regression import *
 from .sync_batchnorm import SynchronizedBatchNorm2d
@@ -167,6 +168,8 @@ class ResnetGeneratorDepth128(nn.Module):
         # transformer blocks parameters
         num_heads = 8
         dim_heads = 64
+
+        wandb.config.update({'attention_heads': num_heads, 'heads_dim': dim_heads})
 
         self.fc = nn.utils.spectral_norm(nn.Linear(z_dim, 4*4*16*ch))
 
