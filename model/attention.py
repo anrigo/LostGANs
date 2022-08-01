@@ -77,7 +77,7 @@ class Attention(nn.Module):
 
         self.norm = LayerNorm(dim)
 
-        self.null_kv = nn.Parameter(torch.randn(2, dim_head))
+        # self.null_kv = nn.Parameter(torch.randn(2, dim_head))
         self.to_q = nn.Linear(dim, inner_dim, bias=False)
         self.to_kv = nn.Linear(dim, dim_head * 2, bias=False)
 
