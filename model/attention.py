@@ -162,6 +162,15 @@ class TransformerBlock(nn.Module):
         context_dim=None,
         cosine_sim_attn=False
     ):
+        '''
+        Set parameters:
+        - dim = c
+        - context_dim = 1
+    
+        For:
+            - x of size (b, c, h, w)
+            - context of size (b, c, 1)
+        '''
         super().__init__()
         self.layers = nn.ModuleList([])
 
