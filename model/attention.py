@@ -29,6 +29,34 @@ class LayerNorm(nn.Module):
         return (x - mean) * (var + self.eps).rsqrt() * self.g
 
 
+class ChanLayerNorm(nn.Module):
+    def __init__(self, dim, eps=1e-5, stable=False):
+        super().__init__()
+        self.eps = eps
+        self.stable = stable
+        self.g = nn.Parameter(torch.ones(1, dim, 1, 1))
+
+    def forward(self, x):
+        if self.stable:
+            x = x / x.amax(dim=1, keepdim=True).detach()
+
+        var = torch.var(x, dim=1, unbiased=False, keepdim=True)
+        mean = torch.mean(x, dim=1, keepdim=True)
+        return (x - mean) / (var + self.eps).sqrt() * self.g
+
+
+# in paper, it seems for self attention layers they did feedforwards with twice channel width
+def ChanFeedForward(dim, mult=2):
+    hidden_dim = int(dim * mult)
+    return nn.Sequential(
+        ChanLayerNorm(dim),
+        nn.Conv2d(dim, hidden_dim, 1, bias=False),
+        nn.GELU(),
+        ChanLayerNorm(hidden_dim),
+        nn.Conv2d(hidden_dim, dim, 1, bias=False)
+    )
+
+
 class Attention(nn.Module):
     def __init__(
         self,
@@ -130,29 +158,23 @@ class TransformerBlock(nn.Module):
         depth=1,
         heads=8,
         dim_head=32,
+        ff_mult=2,
         context_dim=None,
         cosine_sim_attn=False
     ):
-        '''
-        Set parameters:
-        - dim = c
-        - context_dim = 1
-    
-        For:
-            - x of size (b, c, h, w)
-            - context of size (b, c, 1)
-        '''
         super().__init__()
         self.layers = nn.ModuleList([])
 
         for _ in range(depth):
-            self.layers.append(
+            self.layers.append(nn.ModuleList([
                 EinopsToAndFrom('b c h w', 'b (h w) c',
                                 Attention(dim=dim, heads=heads, dim_head=dim_head,
-                                          context_dim=context_dim, cosine_sim_attn=cosine_sim_attn))
-            )
+                                          context_dim=context_dim, cosine_sim_attn=cosine_sim_attn)),
+                ChanFeedForward(dim=dim, mult=ff_mult)
+            ]))
 
     def forward(self, x, context=None):
-        for attn in self.layers:
+        for attn, ff in self.layers:
             x = attn(x, context=context) + x
+            x = ff(x) + x
         return x
