@@ -1,4 +1,3 @@
-import platform
 import numpy as np
 import torch
 import os
@@ -14,7 +13,6 @@ from torch.utils.data import DataLoader
 from sklearn.neighbors import NearestNeighbors
 from torchvision.utils import make_grid
 from torchvision.transforms import Resize
-from cleanfid.inception_pytorch import InceptionV3
 from cleanfid.inception_torchscript import InceptionV3W
 
 
