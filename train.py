@@ -57,7 +57,6 @@ def main(args):
 
     # set run name
     wandb.run.name = args.model
-    wandb.run.save()
 
     # data loader
     train_data = get_dataset(args.dataset, img_size, mode='train',
