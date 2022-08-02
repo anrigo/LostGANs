@@ -49,13 +49,15 @@ def main(args):
             'num_obj': num_obj,
             'z_dim': z_dim,
             'lamb_obj': lamb_obj,
-            'lamb_img': lamb_img,
-            'g_lr': args.g_lr,
-            'd_lr': args.d_lr
+            'lamb_img': lamb_img
         },
         mode='disabled' if args.dw else None
     )
     wandb.config.update(args)
+
+    # set run name
+    wandb.run.name = args.model
+    wandb.run.save()
 
     # data loader
     train_data = get_dataset(args.dataset, img_size, mode='train',
@@ -324,7 +326,7 @@ if __name__ == "__main__":
     parser.add_argument('--use_depth', action=argparse.BooleanOptionalAction,
                         default=False, help='use depth information')
     parser.add_argument('--model', type=str, default='baseline',
-                        help='short model name')
+                        help='short model name, it will also be used as run name')
     parser.add_argument('--dw', action=argparse.BooleanOptionalAction,
                         default=False, help='disable wandb, defaults to False')
     args = parser.parse_args()
