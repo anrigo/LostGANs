@@ -169,7 +169,8 @@ class ResnetGeneratorDepth128(nn.Module):
         num_heads = 8
         dim_heads = 64
 
-        wandb.config.update({'attention_heads': num_heads, 'heads_dim': dim_heads})
+        if wandb.run is not None:
+            wandb.config.update({'attention_heads': num_heads, 'heads_dim': dim_heads})
 
         self.fc = nn.utils.spectral_norm(nn.Linear(z_dim, 4*4*16*ch))
 
