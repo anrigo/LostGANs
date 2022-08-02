@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Union
 import os
 from torchvision.io import read_image
+from torchvision.transforms import Resize, ToTensor, Compose
 from torch.utils.data import Dataset
 import numpy as np
 from data.clevr import CLEVRDataset
@@ -98,9 +99,20 @@ def get_num_classes_and_objects(dataset: str) -> tuple[int, int]:
 
 
 class ImagePathDataset(Dataset):
-    def __init__(self, files, transforms=None):
+    def __init__(self, files, size=None, transforms=None, to_uint8=False):
         self.files = files
-        self.transforms = transforms
+        self.to_uint8 = to_uint8
+        self.transforms = []
+
+        if size is not None:
+            self.transforms.append(Resize(size))
+
+        self.transforms.append(ToTensor())
+
+        if transforms is not None:
+            self.transforms.extend(transforms)
+        
+        self.transforms = Compose(self.transforms)
 
     def __len__(self):
         return len(self.files)
@@ -109,11 +121,13 @@ class ImagePathDataset(Dataset):
         path = self.files[i]
         img = Image.open(path).convert('RGB')
 
-        if self.transforms is not None:
-            img = self.transforms(img)
+        # FloatTensor in [0,1]
+        img = self.transforms(img)
 
-        img = torch.from_numpy(np.array(img))
-        img = torch.permute(img, (2, 0, 1))
+        if self.to_uint8:
+            # normalize from [0,1] to [0,255]
+            # and convert to uint8
+            img = (img*255).type(torch.uint8)
 
         return img
 

@@ -50,7 +50,7 @@ class CLEVRDataset(Dataset):
         image = Image.open(image_path).convert('RGB')
         image = self.transforms(image)
 
-        # clevr images are in [0,1]
+        # images are in [0,1]
         # normalize to [-1,1]
         image = (image * 2) - 1
 
