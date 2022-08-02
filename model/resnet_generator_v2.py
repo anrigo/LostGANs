@@ -179,11 +179,9 @@ class ResnetGeneratorDepth128(nn.Module):
         self.res4 = ResBlock(ch*4, ch*2, upsample=True, num_w=num_w, psp_module=True)
         self.res5 = ResBlock(ch*2, ch*1, upsample=True, num_w=num_w, predict_mask=False)
 
-        # self.transf0 = TransformerBlock(dim=num_o, context_dim=1, heads=num_heads, dim_head=dim_heads)
-        self.transf1 = TransformerBlock(dim=num_o, context_dim=1, heads=num_heads, dim_head=dim_heads)
-        # self.transf2 = TransformerBlock(dim=num_o, context_dim=1, heads=num_heads, dim_head=dim_heads)
-        # self.transf3 = TransformerBlock(dim=num_o, context_dim=1, heads=num_heads, dim_head=dim_heads)
-        # self.transf4 = TransformerBlock(dim=num_o, context_dim=1, heads=num_heads, dim_head=dim_heads)
+        self.transf1 = TransformerBlock(dim=ch*16, context_dim=1, heads=num_heads, dim_head=dim_heads)
+        # self.transf2 = TransformerBlock(dim=ch*8, context_dim=1, heads=num_heads, dim_head=dim_heads)
+        # self.transf3 = TransformerBlock(dim=ch*4, context_dim=1, heads=num_heads, dim_head=dim_heads)
 
         self.final = nn.Sequential(BatchNorm(ch),
                                    nn.ReLU(),
@@ -241,9 +239,6 @@ class ResnetGeneratorDepth128(nn.Module):
         # (batch, 1024, 4, 4)
         x = self.fc(z_im).view(b, -1, 4, 4)
 
-        # apply mask-depth attention
-        # bmask = self.transf0(bmask, context=depths.clone())
-
         # 8x8
         # each resblock returns a mask using
         # a small convolutional network on it's own output features
@@ -282,8 +277,8 @@ class ResnetGeneratorDepth128(nn.Module):
         # (batch, num_o, 8, 8)
         stage_bbox = F.interpolate(bmask, size=(hh, ww), mode='bilinear') * (1 - alpha1) + seman_bbox * alpha1
 
-        # apply mask-depth attention
-        stage_bbox = self.transf1(stage_bbox, context=depths.clone())
+        # apply feats-depth attention
+        x = self.transf1(x, context=depths.clone())
 
         # (batch, 512, 16, 16), (batch, 184, 16, 16)
         x, stage_mask = self.res2(x, w, stage_bbox)
@@ -295,8 +290,8 @@ class ResnetGeneratorDepth128(nn.Module):
         alpha2 = torch.gather(self.sigmoid(self.alpha2).expand(b, -1, -1), dim=1, index=y.view(b, o, 1)).unsqueeze(-1) 
         stage_bbox = F.interpolate(bmask, size=(hh, ww), mode='bilinear') * (1 - alpha2) + seman_bbox * alpha2
 
-        # apply mask-depth attention
-        # stage_bbox = self.transf2(stage_bbox, context=depths.clone())
+        # apply feats-depth attention
+        # x = self.transf2(x, context=depths.clone())
 
         x, stage_mask = self.res3(x, w, stage_bbox)
 
@@ -307,8 +302,8 @@ class ResnetGeneratorDepth128(nn.Module):
         alpha3 = torch.gather(self.sigmoid(self.alpha3).expand(b, -1, -1), dim=1, index=y.view(b, o, 1)).unsqueeze(-1) 
         stage_bbox = F.interpolate(bmask, size=(hh, ww), mode='bilinear') * (1 - alpha3) + seman_bbox * alpha3
 
-        # apply mask-depth attention
-        # stage_bbox = self.transf3(stage_bbox, context=depths.clone())
+        # apply feats-depth attention
+        # x = self.transf3(x, context=depths.clone())
 
         x, stage_mask = self.res4(x, w, stage_bbox)
 
@@ -318,10 +313,6 @@ class ResnetGeneratorDepth128(nn.Module):
         seman_bbox = torch.sigmoid(seman_bbox) * F.interpolate(bbox_mask_, size=(hh, ww), mode='nearest')
         alpha4 = torch.gather(self.sigmoid(self.alpha4).expand(b, -1, -1), dim=1, index=y.view(b, o, 1)).unsqueeze(-1) 
         stage_bbox = F.interpolate(bmask, size=(hh, ww), mode='bilinear') * (1 - alpha4) + seman_bbox * alpha4
-
-        # apply mask-depth attention
-        # stage_bbox = self.transf4(stage_bbox, context=depths.clone())
-
         x, _ = self.res5(x, w, stage_bbox)
 
         # to RGB

@@ -165,11 +165,11 @@ class TransformerBlock(nn.Module):
         '''
         Set parameters:
             - dim = c
-            - context_dim = 1
+            - context_dim = m
     
         For:
             - x of size (b, c, h, w)
-            - context of size (b, c, 1)
+            - context of size (b, c, m)
         '''
         super().__init__()
         self.layers = nn.ModuleList([])
