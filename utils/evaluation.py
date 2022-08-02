@@ -8,8 +8,6 @@ import cleanfid.fid as clean_fid
 from tqdm import tqdm
 from pathlib import Path
 from data.datasets import ImagePathDataset, get_image_files_in_path, DirDataset
-from torchmetrics.image.fid import FrechetInceptionDistance
-from torchmetrics.image.inception import InceptionScore
 from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity
 import wandb
 from torch.utils.data import DataLoader
@@ -84,7 +82,7 @@ def compute_metrics(real_path, fake_path, batch_size, num_workers, device=torch.
 
 
 """
-returns a functions that takes an image in range [0,255]
+returns a function that takes an image in range [0,255]
 and outputs a feature embedding vector
 """
 def build_clean_fid_feature_extractor(name="torchscript_inception", device=torch.device("cuda"), resize_inside=False):
