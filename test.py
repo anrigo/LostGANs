@@ -124,8 +124,8 @@ def main(args):
     netG.eval()
 
     # Sample fake images
-    # print(f'Sampling {len(dataset)} fake images')
-    # sample_test(netG, dataset, num_obj, args.sample_path)
+    print(f'Sampling {len(dataset)} fake images')
+    sample_test(netG, dataset, num_obj, args.sample_path)
 
     # compute metrics
     print('Computing metrics')
@@ -156,10 +156,10 @@ if __name__ == "__main__":
                         help='short model name')
     args = parser.parse_args()
 
-    args.dataset = 'clevr-rubber'
-    args.model_path = 'outputs/clevr-rubber-baseline-color-lbl/G_200.pth'
+    # args.dataset = 'clevr-rubber'
+    # args.model_path = 'outputs/clevr-rubber-baseline-color-lbl/G_200.pth'
     # args.use_depth = True
     # args.model = 'depth-latent'
-    args.keep = True
+    # args.keep = True
 
     main(args)
