@@ -291,7 +291,7 @@ def main(args):
             sample_test(netG, val_data, num_obj, sample_path)
             
             metrics_dict = compute_metrics(
-                val_data.image_dir, sample_path, 50, os.cpu_count())
+                val_data.image_dir, sample_path, 50)
             
             metrics_dict['epoch'] = epoch+1
 
