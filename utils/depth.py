@@ -5,10 +5,10 @@ import cv2
 import numpy as np
 import torch
 from tqdm import tqdm
-# from data.datasets import get_dataset
+import matplotlib
+matplotlib.use('TKAgg')
 import matplotlib.pyplot as plt
 from utils.util import normalize_tensor, scale_boxes
-# from torchvision.utils import draw_bounding_boxes
 from torchvision.transforms.functional import crop
 from torch.nn.functional import pad
 
