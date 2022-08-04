@@ -32,13 +32,16 @@ def get_image_path_loader(path, batch_size, num_workers):
 def compute_metrics(real_path, fake_path, batch_size, num_workers=24, device=torch.device('cuda')):
     '''Given two paths to real and fake images, computes metrics on them'''
 
-    # get files in the same order
+    # get fake and alt files in the same order
     l_alt = get_image_files_in_path(Path(fake_path, 'alt'))
     l_fake = [Path(p.parents[1], p.name) for p in l_alt]
 
+    # real files
+    l_real = get_image_files_in_path(real_path)
+
     fake_ds = ImagePathDataset(l_fake)
     alt_ds = ImagePathDataset(l_alt)
-    real_ds = ImagePathDataset(get_image_files_in_path(real_path))
+    real_ds = ImagePathDataset(l_real)
 
     # if fake images are smaller than InceptionV3 input size 299
     # and real images are bigger
@@ -48,7 +51,7 @@ def compute_metrics(real_path, fake_path, batch_size, num_workers=24, device=tor
 
     if (rh > 299 or rw > 299) and fake_size < 299:
         to_size = fake_size
-        real_ds = ImagePathDataset(get_image_files_in_path(real_path), to_uint8=True, size=to_size)
+        real_ds = ImagePathDataset(l_real, to_uint8=True, size=to_size)
 
     print('Computing FID and IS')
     isc_fid_dict = torch_fidelity.calculate_metrics(
