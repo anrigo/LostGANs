@@ -40,8 +40,9 @@ def get_dataset(dataset: str, img_size: int, mode: str = None, depth_dir: Union[
     clevr_occs2_image_dir = f'./datasets/CLEVR_occlusions2/images/{mode}'
     clevr_occs2_scenes_json = f'./datasets/CLEVR_occlusions2/scenes/CLEVR_{mode}_scenes.json'
 
-    clevr_rubber_image_dir = f'./datasets/CLEVR_rubber/images/{mode}'
-    clevr_rubber_scenes_json = f'./datasets/CLEVR_rubber/scenes/CLEVR_{mode}_scenes.json'
+    clevr_rubber_size = '' if img_size is None else '_'+str(img_size)
+    clevr_rubber_image_dir = f'./datasets/CLEVR_rubber/CLEVR_rubber{clevr_rubber_size}/images/{mode}'
+    clevr_rubber_scenes_json = f'./datasets/CLEVR_rubber/CLEVR_rubber{clevr_rubber_size}/scenes/CLEVR_{mode}_scenes.json'
 
     if depth_dir is None:
         depth_dir = Path('datasets', f'{dataset}-depth', mode)
