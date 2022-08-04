@@ -100,13 +100,14 @@ def get_num_classes_and_objects(dataset: str) -> tuple[int, int]:
 
 
 class ImagePathDataset(Dataset):
-    def __init__(self, files, size=None, transforms=None, to_uint8=False):
+    def __init__(self, files, size=None, transforms=None, to_uint8=False, filename=False):
         self.files = files
         self.to_uint8 = to_uint8
+        self.filename = filename
         self.transforms = []
 
         if size is not None:
-            self.transforms.append(Resize(size))
+            self.transforms.append(Resize((size, size)))
 
         self.transforms.append(ToTensor())
 
@@ -129,6 +130,9 @@ class ImagePathDataset(Dataset):
             # normalize from [0,1] to [0,255]
             # and convert to uint8
             img = (img*255).type(torch.uint8)
+
+        if self.filename:
+            return img, Path(path).name
 
         return img
 
