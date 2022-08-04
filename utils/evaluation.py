@@ -32,7 +32,7 @@ def get_image_path_loader(path, batch_size, num_workers):
 def compute_metrics(real_path, fake_path, batch_size, num_workers=24, device=torch.device('cuda')):
     '''Given two paths to real and fake images, computes metrics on them'''
 
-    # get files in the same order
+    # get fake and alt files in the same order
     l_alt = get_image_files_in_path(Path(fake_path, 'alt'))
     l_fake = [Path(p.parents[1], p.name) for p in l_alt]
 
