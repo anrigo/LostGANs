@@ -38,22 +38,11 @@ def compute_metrics(real_path, fake_path, batch_size, num_workers=24, device=tor
 
     fake_ds = ImagePathDataset(l_fake)
     alt_ds = ImagePathDataset(l_alt)
-    real_ds = ImagePathDataset(get_image_files_in_path(real_path))
-
-    # if fake images are smaller than InceptionV3 input size 299
-    # and real images are bigger
-    rh, rw = real_ds[0].shape[-2:]
-    fake_size = fake_ds[0].shape[-1]
-    to_size = None
-
-    if (rh > 299 or rw > 299) and fake_size < 299:
-        to_size = fake_size
-        real_ds = ImagePathDataset(get_image_files_in_path(real_path), to_uint8=True, size=to_size)
 
     print('Computing FID and IS')
     isc_fid_dict = torch_fidelity.calculate_metrics(
         input1=fake_path,
-        input2=real_ds if to_size is not None else real_path,
+        input2=real_path,
         cuda=(device.type == 'cuda'),
         isc=True,
         fid=True
@@ -77,21 +66,10 @@ def compute_metrics(real_path, fake_path, batch_size, num_workers=24, device=tor
 
     lpips_res = lpips.compute().item()
 
-    if to_size is not None:
-        resizer = clean_fid.make_resizer("PIL", False, "bilinear", (to_size,to_size))
-        def resize_(x):
-            h, w = x.shape[:2]
-            if h > 299 or w > 299:
-                return resizer(x)
-            return x
-
     print('Computing Clean FID')
     # compute clean FID
-    # the Resize operation (custom image transform) it's applied before anything else
     cfid, np_real_feats, np_fake_feats = cleanfid_compute_fid_return_feat(
-        real_path, fake_path, batch_size=batch_size, device=device, num_workers=num_workers,
-        custom_image_tranform=resize_ if to_size is not None else None
-        )
+        real_path, fake_path, batch_size=batch_size, num_workers=num_workers, device=device)
 
     print('Computing Precision, Recall, Density and Coverage')
     # compute k-NN based precision precision, recall, density, and coverage
