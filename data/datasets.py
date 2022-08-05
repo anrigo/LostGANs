@@ -11,12 +11,14 @@ from data.cocostuff_loader import CocoSceneGraphDataset
 from data.vg import VgSceneGraphDataset
 import torch
 from PIL import Image
+from imageio import imsave
+from tqdm import tqdm
 
 IMAGE_EXTENSIONS = {'bmp', 'jpg', 'jpeg', 'pgm', 'png', 'ppm',
                     'tif', 'tiff', 'webp'}
 
 
-def get_dataset(dataset: str, img_size: int, mode: str = None, depth_dir: Union[str, Path] = None, num_obj: int = None, return_filenames: bool = False, return_depth: bool = False):
+def get_dataset(dataset: str, img_size: int, mode: str = None, depth_dir: Union[str, Path] = None, num_obj: int = None, return_filenames: bool = False, return_depth: bool = False, resize: bool = True):
 
     if depth_dir is None:
         depth_dir = Path('datasets', dataset + '-depth', mode)
@@ -82,6 +84,7 @@ def get_dataset(dataset: str, img_size: int, mode: str = None, depth_dir: Union[
         data = CLEVRDataset(image_dir=clevr_rubber_image_dir,
                             scenes_json=clevr_rubber_scenes_json,
                             max_objects_per_image=num_obj,
+                            resize=False,
                             image_size=(img_size, img_size), return_depth=return_depth, occlusions=True)
 
     return data
@@ -113,7 +116,7 @@ class ImagePathDataset(Dataset):
 
         if transforms is not None:
             self.transforms.extend(transforms)
-        
+
         self.transforms = Compose(self.transforms)
 
     def __len__(self):
@@ -161,3 +164,17 @@ def get_image_files_in_path(path: Union[str, Path]) -> list[Path]:
                     for file in path.glob('*.{}'.format(ext))])
 
     return files
+
+
+def resize_dataset(images_path, save_path, size):
+    save_path = Path(save_path)
+    images_path = Path(images_path)
+
+    if not save_path.is_dir():
+        save_path.mkdir(parents=True)
+
+    images = ImagePathDataset(get_image_files_in_path(
+        images_path), size=size, to_uint8=True, filename=True)
+
+    for img, filename in tqdm(images):
+        imsave(Path(save_path, filename), img.permute(1, 2, 0))

@@ -11,7 +11,7 @@ from torch.nn.functional import pad
 
 
 class CLEVRDataset(Dataset):
-    def __init__(self, image_dir: Union[str, Path], scenes_json: Union[str, Path], image_size: tuple[int, int], max_objects_per_image=10, return_depth: bool = False, occlusions: bool = False) -> None:
+    def __init__(self, image_dir: Union[str, Path], scenes_json: Union[str, Path], image_size: tuple[int, int], max_objects_per_image=20, return_depth: bool = False, occlusions: bool = False, resize: bool = True) -> None:
         super(Dataset, self).__init__()
 
         self.image_dir = image_dir
@@ -30,7 +30,10 @@ class CLEVRDataset(Dataset):
         transforms = []
 
         # if image size is set to None, load the original image without resizing
-        if image_size[0] is not None:
+        if resize:
+            if image_size is None or image_size[0] is None or image_size[1] is None:
+                raise ValueError('Resize is set to true, but the requested size is None')
+
             transforms.append(T.Resize(image_size))
 
         transforms.append(T.ToTensor())
@@ -77,7 +80,8 @@ class CLEVRDataset(Dataset):
             depths = normalize_tensor(torch.tensor(depths), (0, 1))
 
             # set dummy objects depth to -0.5
-            depths = pad(depths, (0, self.max_objects_per_image-depths.shape[0]), value=-0.5)
+            depths = pad(depths, (0, self.max_objects_per_image -
+                         depths.shape[0]), value=-0.5)
 
             return image, labels, bboxes, depths
 
@@ -103,8 +107,10 @@ def generate_label_map():
 
 
 def parse_bounding_boxes(scene, idx2label):
-    bboxes = [(obj['x'], obj['y'], obj['width'], obj['height']) for obj in scene['objects']]
-    labels = [idx2label.index(' '.join((obj['color'], obj['shape']))) for obj in scene['objects']]
+    bboxes = [(obj['x'], obj['y'], obj['width'], obj['height'])
+              for obj in scene['objects']]
+    labels = [idx2label.index(' '.join((obj['color'], obj['shape'])))
+              for obj in scene['objects']]
 
     return bboxes, labels
 
