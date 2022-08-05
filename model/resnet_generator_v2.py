@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import wandb
+
+from utils.depth import get_depth_layout_batch
 from .norm_module import *
 from .mask_regression import *
 from .sync_batchnorm import SynchronizedBatchNorm2d
@@ -331,7 +333,7 @@ class ResnetGeneratorTransfFeats128(nn.Module):
 
 class ResnetGeneratorTransfMap128(nn.Module):
     def __init__(self, ch=64, z_dim=128, num_classes=10, num_o=20, output_dim=3):
-        super(ResnetGeneratorTransfFeats128, self).__init__()
+        super(ResnetGeneratorTransfMap128, self).__init__()
         self.num_classes = num_classes
 
         self.label_embedding = nn.Embedding(num_classes, 180)
@@ -391,7 +393,8 @@ class ResnetGeneratorTransfMap128(nn.Module):
 
         w = self.mapping(latent_vector.view(b * o, -1))
 
-        depths = depths.unsqueeze(-1)
+        # (b, 128, 128)
+        dmaps = get_depth_layout_batch(depths, (128,128), bbox.clone())
         
         # preprocess bbox
         # predict a 64x64 mask for each object in each image

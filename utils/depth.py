@@ -127,7 +127,7 @@ def get_depth_layout(depths: torch.Tensor, size: tuple[int, int], boxes: torch.T
         boxes, size, 'coordinates', dtype=torch.int)
 
     # add bboxes depths to an empty depthmap in depth order
-    depth_layout = torch.zeros(size)
+    depth_layout = torch.zeros(size, device=depths.device)
 
     for i, d in boxes_depths:
         # get bounding box coordinates
@@ -141,3 +141,20 @@ def get_depth_layout(depths: torch.Tensor, size: tuple[int, int], boxes: torch.T
         depth_layout[..., y:ymax, x:xmax] = patch
 
     return depth_layout
+
+
+def get_depth_layout_batch(depths_batch: torch.Tensor, size: tuple[int, int], boxes_batch: torch.Tensor) -> torch.Tensor:
+    '''
+    Returns a tensor with b depth maps, one for each sample in the batch
+
+    Parameters:
+        - depths: tensor of size (b, num_objects)
+        - size: tuple (H, W)
+        - boxes: tensor of size (b, num_objetcs, 4)
+
+    Returns:
+        - depthmaps: tensor of size (b, H, W)
+    '''
+
+    return torch.stack([get_depth_layout(depths, size, boxes)
+             for depths, boxes in zip(depths_batch, boxes_batch)], dim=0)
