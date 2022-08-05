@@ -182,8 +182,8 @@ class ResnetGeneratorTransfFeats128(nn.Module):
         self.res5 = ResBlock(ch*2, ch*1, upsample=True, num_w=num_w, predict_mask=False)
 
         self.transf1 = TransformerBlock(dim=ch*16, context_dim=1, heads=num_heads, dim_head=dim_heads, depth=transf_depth)
-        # self.transf2 = TransformerBlock(dim=ch*8, context_dim=1, heads=num_heads, dim_head=dim_heads)
-        # self.transf3 = TransformerBlock(dim=ch*4, context_dim=1, heads=num_heads, dim_head=dim_heads)
+        # self.transf2 = TransformerBlock(dim=ch*8, context_dim=1, heads=num_heads, dim_head=dim_heads, depth=transf_depth)
+        # self.transf3 = TransformerBlock(dim=ch*4, context_dim=1, heads=num_heads, dim_head=dim_heads, depth=transf_depth)
 
         self.final = nn.Sequential(BatchNorm(ch),
                                    nn.ReLU(),
