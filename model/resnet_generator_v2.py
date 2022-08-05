@@ -356,9 +356,9 @@ class ResnetGeneratorTransfMap128(nn.Module):
         self.res4 = ResBlock(ch*4, ch*2, upsample=True, num_w=num_w, psp_module=True)
         self.res5 = ResBlock(ch*2, ch*1, upsample=True, num_w=num_w, predict_mask=False)
 
-        self.transf1 = TransformerBlock(dim=ch*16, context_dim=1, heads=num_heads, dim_head=dim_heads)
-        # self.transf2 = TransformerBlock(dim=ch*8, context_dim=1, heads=num_heads, dim_head=dim_heads)
-        # self.transf3 = TransformerBlock(dim=ch*4, context_dim=1, heads=num_heads, dim_head=dim_heads)
+        self.transf1 = TransformerBlock(dim=ch*16, context_dim=128*128, heads=num_heads, dim_head=dim_heads)
+        # self.transf2 = TransformerBlock(dim=ch*8, context_dim=128*128, heads=num_heads, dim_head=dim_heads)
+        # self.transf3 = TransformerBlock(dim=ch*4, context_dim=128*128, heads=num_heads, dim_head=dim_heads)
 
         self.final = nn.Sequential(BatchNorm(ch),
                                    nn.ReLU(),
@@ -393,8 +393,8 @@ class ResnetGeneratorTransfMap128(nn.Module):
 
         w = self.mapping(latent_vector.view(b * o, -1))
 
-        # (b, 128, 128)
-        dmaps = get_depth_layout_batch(depths, (128,128), bbox.clone())
+        # (b, 128, 128) -> (b, 1, 128*128)
+        dmaps = get_depth_layout_batch(depths, (128,128), bbox.clone()).view(b, 1, -1)
         
         # preprocess bbox
         # predict a 64x64 mask for each object in each image
@@ -456,7 +456,7 @@ class ResnetGeneratorTransfMap128(nn.Module):
         stage_bbox = F.interpolate(bmask, size=(hh, ww), mode='bilinear') * (1 - alpha1) + seman_bbox * alpha1
 
         # apply feats-depth attention
-        x = self.transf1(x, context=depths.clone())
+        x = self.transf1(x, context=dmaps)
 
         # (batch, 512, 16, 16), (batch, 184, 16, 16)
         x, stage_mask = self.res2(x, w, stage_bbox)
@@ -469,7 +469,7 @@ class ResnetGeneratorTransfMap128(nn.Module):
         stage_bbox = F.interpolate(bmask, size=(hh, ww), mode='bilinear') * (1 - alpha2) + seman_bbox * alpha2
 
         # apply feats-depth attention
-        # x = self.transf2(x, context=depths.clone())
+        # x = self.transf2(x, context=dmaps)
 
         x, stage_mask = self.res3(x, w, stage_bbox)
 
@@ -481,7 +481,7 @@ class ResnetGeneratorTransfMap128(nn.Module):
         stage_bbox = F.interpolate(bmask, size=(hh, ww), mode='bilinear') * (1 - alpha3) + seman_bbox * alpha3
 
         # apply feats-depth attention
-        # x = self.transf3(x, context=depths.clone())
+        # x = self.transf3(x, context=dmaps)
 
         x, stage_mask = self.res4(x, w, stage_bbox)
 
