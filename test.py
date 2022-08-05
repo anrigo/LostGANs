@@ -6,7 +6,7 @@ import shutil
 from imageio import imsave
 import torch
 from tqdm import tqdm
-from model.resnet_generator_v2 import ResnetGenerator128, ResnetGeneratorDepth128
+from model.resnet_generator_v2 import ResnetGenerator128, ResnetGeneratorTransfFeats128
 from utils.evaluation import compute_metrics
 from data.datasets import get_dataset, get_num_classes_and_objects
 from utils.util import truncted_random
@@ -98,7 +98,7 @@ def main(args):
 
     # load model
     if args.use_depth:
-        netG = ResnetGeneratorDepth128(
+        netG = ResnetGeneratorTransfFeats128(
             num_classes=num_classes, output_dim=3).cuda()
     else:
         netG = ResnetGenerator128(num_classes=num_classes, output_dim=3).cuda()

@@ -79,7 +79,7 @@ def main(args):
 
     # Load model
     if args.use_depth:
-        netG = ResnetGeneratorDepth128(
+        netG = ResnetGeneratorTransfFeats128(
             num_classes=num_classes, output_dim=3).cuda()
         netD = CombineDiscriminator128(num_classes=num_classes).cuda()
     else:
@@ -331,10 +331,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # train params
-    # args.dataset = 'clevr-rubber'
-    # args.batch_size = 8
-    # args.use_depth = True
-    # args.model = 'test'
-    # args.dw = True
+    args.dataset = 'clevr-rubber'
+    args.batch_size = 8
+    args.use_depth = True
+    args.model = 'test'
+    args.dw = True
 
     main(args)
