@@ -1,9 +1,13 @@
+from pathlib import Path
 import numpy as np
 import torch
 import torch.nn as nn
 from torchvision import models
 import torchvision.transforms as T
 import torch.nn.functional as F
+from tqdm import tqdm
+from imageio import imsave
+from data.datasets import ImagePathDataset, get_image_files_in_path
 
 
 def crop_resize(image, bbox, imsize=64, cropsize=28, label=None):
@@ -157,3 +161,17 @@ def scale_boxes(boxes: torch.Tensor, shape: 'tuple[int, int]', format: str = Non
             bboxes = bboxes.type(dtype)
 
     return bboxes
+
+
+def resize_dataset(images_path, save_path, size):
+    save_path = Path(save_path)
+    images_path = Path(images_path)
+
+    if not save_path.is_dir():
+        save_path.mkdir(parents=True)
+
+    images = ImagePathDataset(get_image_files_in_path(
+        images_path), size=size, to_uint8=True, filename=True)
+
+    for img, filename in tqdm(images):
+        imsave(Path(save_path, filename), img.permute(1, 2, 0))
