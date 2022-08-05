@@ -331,10 +331,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # train params
-    args.dataset = 'clevr-rubber'
-    args.batch_size = 8
-    args.use_depth = True
-    args.model = 'test'
-    args.dw = True
+    # args.dataset = 'clevr-rubber'
+    # args.batch_size = 8
+    # args.use_depth = True
+    # args.model = 'test'
+    # args.dw = True
 
     main(args)
