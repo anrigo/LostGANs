@@ -71,8 +71,8 @@ def main(args):
         train_data, batch_size=args.batch_size,
         drop_last=True, shuffle=True, num_workers=8)
 
-    # log fake images and loss every n iterations, about 10 times per epoch
-    log_every = floor(len(dataloader)/10)
+    # log fake images and loss every n iterations, about 30 times per epoch
+    log_every = floor(len(dataloader)/30)
 
     # validate and log metrics every n epochs
     val_every = 3
