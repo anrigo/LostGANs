@@ -5,9 +5,6 @@ import cv2
 import numpy as np
 import torch
 from tqdm import tqdm
-import matplotlib
-matplotlib.use('TKAgg')
-import matplotlib.pyplot as plt
 from utils.util import normalize_tensor, scale_boxes
 from torchvision.transforms.functional import crop
 from torch.nn.functional import pad
@@ -16,7 +13,7 @@ device = torch.device(
     "cuda") if torch.cuda.is_available() else torch.device("cpu")
 
 
-def depth_estimation(dataset, ds, mode, visualize=True, save=False, limit=None):
+def depth_estimation(dataset, ds, mode, save=False, limit=None):
     '''
     Use MiDaS Large to estimate depth from each image in the dataset and save
     the depthmaps as .npy files, currently works for coco
@@ -72,13 +69,6 @@ def depth_estimation(dataset, ds, mode, visualize=True, save=False, limit=None):
                     align_corners=False,
                 )
                 prediction = prediction.squeeze().cpu().numpy()
-
-            # visualize
-            if visualize:
-                _, axs = plt.subplots(1, 2)
-                axs[0].imshow(o_image.permute(1, 2, 0) * 0.5 + 0.5)
-                axs[1].imshow(prediction, cmap='gray')
-                plt.show()
 
             # save depthmap
             if save:
