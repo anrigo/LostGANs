@@ -79,7 +79,7 @@ def main(args):
 
     # Load model
     if args.use_depth:
-        netG = ResnetGeneratorTransfMap128(
+        netG = ResnetGeneratorTransfFeats128(
             num_classes=num_classes, output_dim=3).cuda()
         netD = CombineDiscriminator128(num_classes=num_classes).cuda()
     else:
