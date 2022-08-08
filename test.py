@@ -92,7 +92,7 @@ def main(args):
         args.sample_path, args.dataset + '-' + args.model)
 
     # get test dataset
-    dataset = get_dataset(args.dataset, None, 'test',
+    dataset = get_dataset(args.dataset, 128, 'test',
                           num_obj=num_obj,
                           return_depth=args.use_depth)
 
