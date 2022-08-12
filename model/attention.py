@@ -65,12 +65,18 @@ class Attention(nn.Module):
         dim_head=64,
         heads=8,
         context_dim=None,
-        cosine_sim_attn=False
+        cosine_sim_attn=False,
+        crossonly=False
     ):
         super().__init__()
         self.scale = dim_head ** -0.5 if not cosine_sim_attn else 1.
         self.cosine_sim_attn = cosine_sim_attn
         self.cosine_sim_scale = 16 if cosine_sim_attn else 1
+
+        # default: self-attention + cross-attention
+        # self-attention only: context_dim = None, crossonly = False
+        # cross-attention only: crossonly = True, context_dim = m
+        self.crossonly = crossonly
 
         self.heads = heads
         inner_dim = dim_head * heads
@@ -110,8 +116,12 @@ class Attention(nn.Module):
         if exists(context):
             assert exists(self.to_context)
             ck, cv = self.to_context(context).chunk(2, dim=-1)
-            k = torch.cat((ck, k), dim=-2)
-            v = torch.cat((cv, v), dim=-2)
+
+            if not self.crossonly:
+                k = torch.cat((ck, k), dim=-2)
+                v = torch.cat((cv, v), dim=-2)
+            else:
+                k, v = ck, cv
 
         # cosine sim attention
 
@@ -160,7 +170,8 @@ class TransformerBlock(nn.Module):
         dim_head=32,
         ff_mult=2,
         context_dim=None,
-        cosine_sim_attn=False
+        cosine_sim_attn=False,
+        crossonly=False
     ):
         '''
         Set parameters:
@@ -170,6 +181,10 @@ class TransformerBlock(nn.Module):
         For:
             - x of size (b, c, h, w)
             - context of size (b, c, m)
+        
+        default: self-attention + cross-attention
+        self-attention only: context_dim = None, crossonly = False
+        cross-attention only: crossonly = True, context_dim = m
         '''
         super().__init__()
         self.layers = nn.ModuleList([])
@@ -178,7 +193,7 @@ class TransformerBlock(nn.Module):
             self.layers.append(nn.ModuleList([
                 EinopsToAndFrom('b c h w', 'b (h w) c',
                                 Attention(dim=dim, heads=heads, dim_head=dim_head,
-                                          context_dim=context_dim, cosine_sim_attn=cosine_sim_attn)),
+                                          context_dim=context_dim, cosine_sim_attn=cosine_sim_attn, crossonly=crossonly)),
                 ChanFeedForward(dim=dim, mult=ff_mult)
             ]))
 

@@ -183,10 +183,7 @@ class ResnetGeneratorTransfFeats128(nn.Module):
         self.res4 = ResBlock(ch*4, ch*2, upsample=True, num_w=num_w, psp_module=True)
         self.res5 = ResBlock(ch*2, ch*1, upsample=True, num_w=num_w, predict_mask=False)
 
-        # self.transf1 = TransformerBlock(dim=ch*16, context_dim=1, heads=num_heads, dim_head=dim_heads, depth=transf_depth)
-        # self.transf2 = TransformerBlock(dim=ch*8, context_dim=1, heads=num_heads, dim_head=dim_heads, depth=transf_depth)
-        # self.transf3 = TransformerBlock(dim=ch*4, context_dim=1, heads=num_heads, dim_head=dim_heads, depth=transf_depth)
-        self.transf4 = TransformerBlock(dim=ch*2, context_dim=1, heads=num_heads, dim_head=dim_heads, depth=transf_depth)
+        self.transf3 = TransformerBlock(dim=ch*4, context_dim=1, heads=num_heads, dim_head=dim_heads, depth=transf_depth, crossonly=False)
 
         self.final = nn.Sequential(BatchNorm(ch),
                                    nn.ReLU(),
@@ -282,9 +279,6 @@ class ResnetGeneratorTransfFeats128(nn.Module):
         # (batch, num_o, 8, 8)
         stage_bbox = F.interpolate(bmask, size=(hh, ww), mode='bilinear') * (1 - alpha1) + seman_bbox * alpha1
 
-        # apply feats-depth attention
-        # x = self.transf1(x, context=depths.clone())
-
         # (batch, 512, 16, 16), (batch, 184, 16, 16)
         x, stage_mask = self.res2(x, w, stage_bbox)
 
@@ -294,9 +288,6 @@ class ResnetGeneratorTransfFeats128(nn.Module):
         seman_bbox = torch.sigmoid(seman_bbox) * F.interpolate(bbox_mask_, size=(hh, ww), mode='nearest')
         alpha2 = torch.gather(self.sigmoid(self.alpha2).expand(b, -1, -1), dim=1, index=y.view(b, o, 1)).unsqueeze(-1) 
         stage_bbox = F.interpolate(bmask, size=(hh, ww), mode='bilinear') * (1 - alpha2) + seman_bbox * alpha2
-
-        # apply feats-depth attention
-        # x = self.transf2(x, context=depths.clone())
 
         x, stage_mask = self.res3(x, w, stage_bbox)
 
@@ -308,7 +299,9 @@ class ResnetGeneratorTransfFeats128(nn.Module):
         stage_bbox = F.interpolate(bmask, size=(hh, ww), mode='bilinear') * (1 - alpha3) + seman_bbox * alpha3
 
         # apply feats-depth attention
-        # x = self.transf3(x, context=depths.clone())
+        x = self.transf3(x, context=depths.clone())
+        # apply self-attention only
+        # x = self.transf3(x)
 
         x, stage_mask = self.res4(x, w, stage_bbox)
 
@@ -319,185 +312,8 @@ class ResnetGeneratorTransfFeats128(nn.Module):
         alpha4 = torch.gather(self.sigmoid(self.alpha4).expand(b, -1, -1), dim=1, index=y.view(b, o, 1)).unsqueeze(-1) 
         stage_bbox = F.interpolate(bmask, size=(hh, ww), mode='bilinear') * (1 - alpha4) + seman_bbox * alpha4
         
-        # apply feats-depth attention
-        x = self.transf4(x, context=depths.clone())
-        
         x, _ = self.res5(x, w, stage_bbox)
 
-
-        # to RGB
-        x = self.final(x)
-        return x
-
-    def init_parameter(self):
-        for k in self.named_parameters():
-            if k[1].dim() > 1:
-                torch.nn.init.orthogonal_(k[1])
-            if k[0][-4:] == 'bias':
-                torch.nn.init.constant_(k[1], 0)
-
-
-class ResnetGeneratorTransfMap128(nn.Module):
-    def __init__(self, ch=64, z_dim=128, num_classes=10, num_o=20, output_dim=3):
-        super(ResnetGeneratorTransfMap128, self).__init__()
-        self.num_classes = num_classes
-
-        self.label_embedding = nn.Embedding(num_classes, 180)
-
-        num_w = 128+180
-
-        # transformer blocks parameters
-        transf_depth = 1
-        num_heads = 8
-        dim_heads = 64
-
-        if wandb.run is not None:
-            wandb.config.update({'attention_heads': num_heads, 'heads_dim': dim_heads, 'transf_depth': transf_depth})
-
-        self.fc = nn.utils.spectral_norm(nn.Linear(z_dim, 4*4*16*ch))
-
-        self.res1 = ResBlock(ch*16, ch*16, upsample=True, num_w=num_w)
-        self.res2 = ResBlock(ch*16, ch*8, upsample=True, num_w=num_w)
-        self.res3 = ResBlock(ch*8, ch*4, upsample=True, num_w=num_w)
-        self.res4 = ResBlock(ch*4, ch*2, upsample=True, num_w=num_w, psp_module=True)
-        self.res5 = ResBlock(ch*2, ch*1, upsample=True, num_w=num_w, predict_mask=False)
-
-        self.transf1 = TransformerBlock(dim=ch*16, context_dim=128*128, heads=num_heads, dim_head=dim_heads)
-        # self.transf2 = TransformerBlock(dim=ch*8, context_dim=128*128, heads=num_heads, dim_head=dim_heads)
-        # self.transf3 = TransformerBlock(dim=ch*4, context_dim=128*128, heads=num_heads, dim_head=dim_heads)
-
-        self.final = nn.Sequential(BatchNorm(ch),
-                                   nn.ReLU(),
-                                   conv2d(ch, output_dim, 3, 1, 1),
-                                   nn.Tanh())
-
-        # mapping function
-        mapping = list()
-        self.mapping = nn.Sequential(*mapping)
-
-        self.alpha1 = nn.Parameter(torch.zeros(1, 184, 1))
-        self.alpha2 = nn.Parameter(torch.zeros(1, 184, 1))
-        self.alpha3 = nn.Parameter(torch.zeros(1, 184, 1))
-        self.alpha4 = nn.Parameter(torch.zeros(1, 184, 1))
-
-        self.sigmoid = nn.Sigmoid()
-
-        self.mask_regress = MaskRegressNetv2(num_w)
-        self.init_parameter()
-
-    def forward(self, z, bbox, y, depths, z_im=None) -> torch.Tensor:
-        # z shape: batch, number of objects, latent code length
-
-        # b = batch size, o = number of objects/latents
-        b, o = z.size(0), z.size(1)
-        label_embedding = self.label_embedding(y)
-
-        z = z.view(b * o, -1)
-        label_embedding = label_embedding.view(b * o, -1)
-
-        latent_vector = torch.cat((z, label_embedding), dim=1).view(b, o, -1)
-
-        w = self.mapping(latent_vector.view(b * o, -1))
-
-        # (b, 128, 128) -> (b, 1, 128*128)
-        dmaps = get_depth_layout_batch(depths, (128,128), bbox.clone()).view(b, 1, -1)
-        
-        # preprocess bbox
-        # predict a 64x64 mask for each object in each image
-        # each mask has 0 outside of the corresponding bounding box
-        # M_s in the paper
-        # (batch, num_o, 64, 64)
-        bmask = self.mask_regress(w, bbox)
-
-        if z_im is None:
-            z_im = torch.randn((b, 128), device=z.device)
-
-        # 64x64 binary mask for each bounding box
-        # 1 inside bbox, 0 outside
-        # used to clip the mask obtained from
-        # each resblock output features
-        # (batch, num_o, 64, 64)
-        bbox_mask_ = bbox_mask(z, bbox, 64, 64)
-
-        # 4x4
-        # (batch, 1024, 4, 4)
-        x = self.fc(z_im).view(b, -1, 4, 4)
-
-        # 8x8
-        # each resblock returns a mask using
-        # a small convolutional network on it's own output features
-        # (batch, 1024, 8, 8), (batch, 184, 8, 8)
-        x, stage_mask = self.res1(x, w, bmask)
-
-        # 16x16
-        hh, ww = x.size(2), x.size(3)
-
-        # from stage_mask (batch, 184, h, w) get only 31 masks
-        # resulting in (batch, num_o, h, w), a mask for each obj
-        # (batch, num_o, 8, 8)
-        seman_bbox = batched_index_select(stage_mask, dim=1, index=y.view(b, o, 1, 1)) # size (b, num_o, h, w)
-
-        # clip the masks so that everything outside the corresponding
-        # bounding box is set to 0
-        # M_f in the paper
-        # (batch, num_o, 8, 8)
-        seman_bbox = torch.sigmoid(seman_bbox) * F.interpolate(bbox_mask_, size=(hh, ww), mode='nearest')
-        
-        # 184 is the max number of possible classes
-        # alpha learnable weight to balance the two masks
-        # expand alpha from (1, 184, 1) to (batch, 184, 1)
-        # reshape labels y from (batch, num_o) to (batch, num_o, 1) to match alpha
-        # from the 184 alphas extract the relevant num_o ones, one alpha for each label
-        # unsqueeze alpha to append a dimension at the end
-        # (batch, num_o, 1, 1)
-        alpha1 = torch.gather(self.sigmoid(self.alpha1).expand(b, -1, -1), dim=1, index=y.view(b, o, 1)).unsqueeze(-1)
-
-        # bmask: masks predicted by regressor from the bbox
-        # seman_bbox: masks predicted by the convolutional ToMask operation
-        #             in the ResBlock, using the output features of the block itself
-        #             clipped based on the layout, 0 outside of the bboxes
-        # combine the two masks using learnable alpha as weight
-        # M_s [bmask] * (1 - alpha) + M_f [seman_bbox] * alpha
-        # (batch, num_o, 8, 8)
-        stage_bbox = F.interpolate(bmask, size=(hh, ww), mode='bilinear') * (1 - alpha1) + seman_bbox * alpha1
-
-        # apply feats-depth attention
-        x = self.transf1(x, context=dmaps)
-
-        # (batch, 512, 16, 16), (batch, 184, 16, 16)
-        x, stage_mask = self.res2(x, w, stage_bbox)
-
-        # 32x32
-        hh, ww = x.size(2), x.size(3)
-        seman_bbox = batched_index_select(stage_mask, dim=1, index=y.view(b, o, 1, 1)) # size (b, num_o, h, w)
-        seman_bbox = torch.sigmoid(seman_bbox) * F.interpolate(bbox_mask_, size=(hh, ww), mode='nearest')
-        alpha2 = torch.gather(self.sigmoid(self.alpha2).expand(b, -1, -1), dim=1, index=y.view(b, o, 1)).unsqueeze(-1) 
-        stage_bbox = F.interpolate(bmask, size=(hh, ww), mode='bilinear') * (1 - alpha2) + seman_bbox * alpha2
-
-        # apply feats-depth attention
-        # x = self.transf2(x, context=dmaps)
-
-        x, stage_mask = self.res3(x, w, stage_bbox)
-
-        # 64x64
-        hh, ww = x.size(2), x.size(3)
-        seman_bbox = batched_index_select(stage_mask, dim=1, index=y.view(b, o, 1, 1)) # size (b, num_o, h, w)
-        seman_bbox = torch.sigmoid(seman_bbox) * F.interpolate(bbox_mask_, size=(hh, ww), mode='nearest')
-        alpha3 = torch.gather(self.sigmoid(self.alpha3).expand(b, -1, -1), dim=1, index=y.view(b, o, 1)).unsqueeze(-1) 
-        stage_bbox = F.interpolate(bmask, size=(hh, ww), mode='bilinear') * (1 - alpha3) + seman_bbox * alpha3
-
-        # apply feats-depth attention
-        # x = self.transf3(x, context=dmaps)
-
-        x, stage_mask = self.res4(x, w, stage_bbox)
-
-        # 128x128
-        hh, ww = x.size(2), x.size(3)
-        seman_bbox = batched_index_select(stage_mask, dim=1, index=y.view(b, o, 1, 1)) # size (b, num_o, h, w)
-        seman_bbox = torch.sigmoid(seman_bbox) * F.interpolate(bbox_mask_, size=(hh, ww), mode='nearest')
-        alpha4 = torch.gather(self.sigmoid(self.alpha4).expand(b, -1, -1), dim=1, index=y.view(b, o, 1)).unsqueeze(-1) 
-        stage_bbox = F.interpolate(bmask, size=(hh, ww), mode='bilinear') * (1 - alpha4) + seman_bbox * alpha4
-        x, _ = self.res5(x, w, stage_bbox)
 
         # to RGB
         x = self.final(x)
