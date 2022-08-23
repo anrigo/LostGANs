@@ -178,9 +178,15 @@ def sample_one(idx: int = None, show_labels: bool = False):
     plt.show()
 
 
-def direct_comparison(num_gen: int = 6):
+def direct_comparison(num_gen: int = 12, cols: int = 6, figunitsize: tuple[int] = 4, visualize_layout: bool = False):
     '''
-    Sample `num_gen` layout randomly from the dataset, the generate baseline fakes and depth-aware fakes for each one and display the result in a grid.
+    Sample `num_gen` layout randomly from the dataset, then generate baseline fakes and depth-aware fakes for each one and display the result in a grid.
+
+    Args:
+        num_gen: number of layouts to sample
+        cols: number of rows of the final grid
+        figunitsize: plot size of a single fake image, before stacking
+        visualize_layout: stack the depth layout on top of the two fakes
     '''
 
     # add text with PIL
@@ -198,9 +204,6 @@ def direct_comparison(num_gen: int = 6):
         # get depth layout
         depth_layout = get_depth_layout(
             depth, real.shape[-2:], bbox).unsqueeze(0)
-
-        coord_box = scale_boxes(
-            bbox, dataset.image_size, 'coordinates', dtype=torch.int)
 
         # sample noise vectors
         z_obj = torch.from_numpy(truncted_random(
@@ -228,14 +231,22 @@ def direct_comparison(num_gen: int = 6):
 
         # stack tensors: depth-layout, baseline fake, depth-aware fake
         # tensors are now in [0,1]
-        fakes.append(torch.cat((
-            torch.cat((depth_layout, depth_layout, depth_layout), 0), to_tens(
-                fake_images_base), to_tens(fake_images)
-        ), dim=1))
+        if visualize_layout:
+            fakes.append(torch.cat((
+                torch.cat((depth_layout, depth_layout, depth_layout), 0), to_tens(
+                    fake_images_base), to_tens(fake_images)
+            ), dim=1))
+        else:
+            fakes.append(torch.cat((to_tens(fake_images_base), to_tens(fake_images)
+                                    ), dim=1))
+
+    # number of stacked images in each frame
+    framestacked = 3 if visualize_layout else 2
 
     # build a grid and plot
-    fig = plt.figure(figsize=(15, 5*num_gen))
-    plt.imshow(make_grid(fakes, nrow=num_gen).permute(1, 2, 0))
+    rows = int(num_gen/cols)
+    plt.figure(figsize=(framestacked*figunitsize*rows, figunitsize*cols))
+    plt.imshow(make_grid(fakes, nrow=cols).permute(1, 2, 0))
     plt.axis('off')
     plt.show()
 
