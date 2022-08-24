@@ -55,13 +55,14 @@ def compute_metrics(real_path, fake_path, batch_size, num_workers=24, device=tor
 
     print('Computing LPIPS')
     lpips = LearnedPerceptualImagePatchSimilarity(net_type='vgg').to(device)
-    
+
     # compute lpips on pairs of images generated from the same layout
     for imgs in tqdm(zip(fake_ds, alt_ds)):
         fake, alt = imgs
 
         # normalize from [0,255] to [-1,1] as required by the metric
-        fake, alt = ((fake.to(device)/255*2)-1).unsqueeze(0), ((alt.to(device)/255*2)-1).unsqueeze(0)
+        fake, alt = ((fake.to(device)/255*2) -
+                     1).unsqueeze(0), ((alt.to(device)/255*2)-1).unsqueeze(0)
         lpips.update(fake, alt)
 
     lpips_res = lpips.compute().item()
@@ -83,9 +84,12 @@ def compute_metrics(real_path, fake_path, batch_size, num_workers=24, device=tor
 returns a function that takes an image in range [0,255]
 and outputs a feature embedding vector
 """
+
+
 def build_clean_fid_feature_extractor(name="torchscript_inception", device=torch.device("cuda"), resize_inside=False):
     path = 'outputs'
-    model = InceptionV3W(path, download=True, resize_inside=resize_inside).to(device)
+    model = InceptionV3W(path, download=True,
+                         resize_inside=resize_inside).to(device)
     model.eval()
     def model_fn(x): return model(x)
     return model_fn
@@ -236,13 +240,13 @@ def compute_prdc(real_features, fake_features, nearest_k=5):
 
 # KNN VIS
 
-def knn_vis(real_path, fake_path, dataset_name, size, batch_size=10):
+def knn_vis(real_path, fake_path, dataset_name, size, batch_size=10, knn_k=16, vis_knn=10):
     fid_kwargs = dict()
     fid_kwargs['dataset_name'] = dataset_name
     fid_kwargs['image_size'] = size
 
     return get_knn_eval_dict(sample_dir=fake_path, gt_dir_4fid=real_path,
-                             fid_kwargs=fid_kwargs, batch_size=batch_size)
+                             fid_kwargs=fid_kwargs, batch_size=batch_size, knn_k=knn_k, vis_knn=vis_knn)
 
 
 def get_feat_extract_fn(fid_kwargs, name='simclr'):
@@ -312,7 +316,7 @@ def get_knn_eval_dict(sample_dir, gt_dir_4fid, fid_kwargs, knn_k=16, vis_knn=10,
         knn_k = 4
     nn_obj_sample = NearestNeighbors(n_neighbors=knn_k)
     nn_obj_gt = NearestNeighbors(n_neighbors=knn_k)
-    nn_obj_all = NearestNeighbors(n_neighbors=knn_k)
+    # nn_obj_all = NearestNeighbors(n_neighbors=knn_k)
     print(f'running KNN for sample dir: {sample_dir}, gt_dir: {gt_dir_4fid}')
     knn_dict = dict()
     for feat_name in ['inception']:
@@ -326,10 +330,10 @@ def get_knn_eval_dict(sample_dir, gt_dir_4fid, fid_kwargs, knn_k=16, vis_knn=10,
         # set desired number of neighbors
         nn_obj_sample.fit(feats_sample.cpu())
         nn_obj_gt.fit(feats_gt.cpu())
-        if False:
-            feats_all = torch.cat([feats_sample, feats_gt], 0)
-            imgs_all = torch.cat([imgs_sample, imgs_gt], 0)
-            nn_obj_all.fit(feats_all.cpu())
+
+        # feats_all = torch.cat([feats_sample, feats_gt], 0)
+        # imgs_all = torch.cat([imgs_sample, imgs_gt], 0)
+        # nn_obj_all.fit(feats_all.cpu())
 
         query_wandb_result = get_wandbimg_by_knn(
             feats_q=feats_sample[:vis_knn], imgs_q=imgs_sample[:vis_knn], imgs_gallery=imgs_gt, nn_obj_gallery=nn_obj_gt)

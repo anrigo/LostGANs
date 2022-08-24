@@ -26,9 +26,7 @@ def sample_test(netG, dataset, num_obj, sample_path, lpips_samples=100):
         os.makedirs(alt_path)
     thres = 2.0
 
-    print(f'Sampling {len(dataset)} fake images')
-
-    for idx, data in tqdm(enumerate(dataloader)):
+    for idx, data in tqdm(enumerate(dataloader), total=len(dataset), desc=f'Sampling {len(dataset)} fake images in {sample_path}'):
 
         if dataset.return_depth:
             real_images, label, bbox, depths = data

@@ -6,16 +6,18 @@ from data.vg import *
 from utils.util import *
 import matplotlib.pyplot as plt
 from torchvision.utils import draw_bounding_boxes, make_grid
-from torchvision.transforms import Resize, ToPILImage, ToTensor
+import torchvision.transforms.functional as T
 from PIL import ImageDraw
 from typing import Union, Callable
 from utils.depth import get_depth_layout
 from numpy.random import randint
 from tqdm import tqdm
+import utils.evaluation as ev
+from test import sample_test
 
 
 # MODULE VARIABLES
-args = dataset = idx2name = num_o = num_classes = thres = netGbase = netGdepth = None
+args = dataset = dataset_base = idx2name = num_o = num_classes = thres = netGbase = netGdepth = None
 
 
 def init(args, dataset, idx2name, num_o, num_classes, thres, netGbase, netGdepth):
@@ -189,10 +191,6 @@ def direct_comparison(num_gen: int = 12, cols: int = 6, figunitsize: tuple[int] 
         visualize_layout: stack the depth layout on top of the two fakes
     '''
 
-    # add text with PIL
-    to_pil = ToPILImage()
-    to_tens = ToTensor()
-
     fakes = []
 
     for idx in randint(0, len(dataset), num_gen):
@@ -220,8 +218,8 @@ def direct_comparison(num_gen: int = 12, cols: int = 6, figunitsize: tuple[int] 
             0), z_im=z_im, y=label.long().cuda(), depths=depth.clone().cuda().unsqueeze(0)).squeeze()
 
         # normalize from [-1,1] to [0,255] and convert to PIL image
-        fake_images_base, fake_images = to_pil(((fake_images_base.detach() + 1) / 2 * 255).type(
-            torch.uint8).cpu()), to_pil(((fake_images.detach() + 1) / 2 * 255).type(torch.uint8).cpu())
+        fake_images_base, fake_images = T.to_pil_image(((fake_images_base.detach() + 1) / 2 * 255).type(
+            torch.uint8).cpu()), T.to_pil_image(((fake_images.detach() + 1) / 2 * 255).type(torch.uint8).cpu())
 
         base_draw, depth_draw = ImageDraw.Draw(
             fake_images_base), ImageDraw.Draw(fake_images)
@@ -233,11 +231,11 @@ def direct_comparison(num_gen: int = 12, cols: int = 6, figunitsize: tuple[int] 
         # tensors are now in [0,1]
         if visualize_layout:
             fakes.append(torch.cat((
-                torch.cat((depth_layout, depth_layout, depth_layout), 0), to_tens(
-                    fake_images_base), to_tens(fake_images)
+                torch.cat((depth_layout, depth_layout, depth_layout), 0), T.to_tensor(
+                    fake_images_base), T.to_tensor(fake_images)
             ), dim=1))
         else:
-            fakes.append(torch.cat((to_tens(fake_images_base), to_tens(fake_images)
+            fakes.append(torch.cat((T.to_tensor(fake_images_base), T.to_tensor(fake_images)
                                     ), dim=1))
 
     # number of stacked images in each frame
@@ -518,13 +516,9 @@ def move_objects_video(num_gen: int = 23, layout_idx: int = 0, transform_bbox: l
         fake_images_base = netGbase.forward(
             z_obj, bbox_cp.cuda().unsqueeze(0), z_im, label.long().cuda())
 
-        # add text with PIL
-        to_pil = ToPILImage()
-        to_tens = ToTensor()
-
         # normalize from [-1,1] to [0,255] and convert to PIL image
-        fake_images_base, fake_images = to_pil(((fake_images_base.detach().squeeze().cpu() + 1) / 2 * 255).type(
-            torch.uint8)), to_pil(((fake_images.detach().squeeze().cpu() + 1) / 2 * 255).type(torch.uint8))
+        fake_images_base, fake_images = T.to_pil_image(((fake_images_base.detach().squeeze().cpu() + 1) / 2 * 255).type(
+            torch.uint8)), T.to_pil_image(((fake_images.detach().squeeze().cpu() + 1) / 2 * 255).type(torch.uint8))
 
         base_draw, depth_draw = ImageDraw.Draw(
             fake_images_base), ImageDraw.Draw(fake_images)
@@ -535,7 +529,7 @@ def move_objects_video(num_gen: int = 23, layout_idx: int = 0, transform_bbox: l
         # normal on top, depth on bottom
         # tensors are now in [0,1]
         fake_images = torch.cat(
-            (to_tens(fake_images_base), to_tens(fake_images)), dim=1).permute(1, 2, 0)
+            (T.to_tensor(fake_images_base), T.to_tensor(fake_images)), dim=1).permute(1, 2, 0)
 
         # back to [0,255] uint8
         fakes.append(
@@ -561,6 +555,53 @@ def move_objects_video(num_gen: int = 23, layout_idx: int = 0, transform_bbox: l
     writer.release()
 
     print(f'Frames saved in {filename}')
+
+
+def knn_analysis(use_depth: bool = True, figunitsize: int = 2, knn_k=16, vis_knn=10):
+    '''
+    For a ground truth image the function finds the `knn_k` nearest neighbors in the generated images.
+    Then, for a generated image, the function finds the `knn_k` nearest neighbors in the ground truth images.
+    The process is repeated for `vis_knn` query images.
+    The distance is computed on the images' inception features.
+
+    Args:
+        use_depth: whether to use the depth-aware model or not
+        figunitsize: dimension of a single image in the grid
+        knn_k: number of neighbors to look for
+        vis_knn: number of query images
+    '''
+
+    # output directory samples/dataset-model_name
+    sample_path = os.path.join('samples', args.dataset + '-')
+
+    fake_path = Path(
+        sample_path + (args.model_depth_name if use_depth else args.model_name))
+
+    if not fake_path.is_dir():
+        if use_depth:
+            sample_test(netGdepth, dataset, num_o, fake_path, 0)
+        else:
+            sample_test(netGbase, dataset_base, num_o, fake_path, 0)
+    else:
+        print(f'Found samples in {fake_path}')
+
+    knn_dict = ev.knn_vis(dataset.image_dir, fake_path, args.dataset, 128, knn_k=knn_k, vis_knn=vis_knn)
+
+    figsize = (vis_knn*figunitsize, (knn_k+1)*figunitsize)
+
+    print('Query ground truths by sample')
+    plt.figure(figsize=figsize)
+    plt.imshow(make_grid([T.to_tensor(wandb_img.image)
+               for wandb_img in knn_dict['knn_inception_query_gt_by_sample']], nrow=1).permute(1, 2, 0))
+    plt.axis('off')
+    plt.show()
+
+    print('Query samples by ground truth')
+    plt.figure(figsize=figsize)
+    plt.imshow(make_grid([T.to_tensor(wandb_img.image)
+               for wandb_img in knn_dict['knn_inception_query_sample_by_gt']], nrow=1).permute(1, 2, 0))
+    plt.axis('off')
+    plt.show()
 
 
 class transforms:
