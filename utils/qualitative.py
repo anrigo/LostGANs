@@ -388,11 +388,9 @@ def depth_transform(idx: int, frames: int = 2, transform_idx: list[int] = None, 
     '''
 
     # control plot order and size
-    rows, cols, figsize = frames, 2, (12, 4)
-    figsized = (9, 9)
+    rows, cols, figsize = frames+1, 2, (8, 12)
 
-    _, axs = plt.subplots(1, 3, figsize=figsize)
-    _, axsd = plt.subplots(rows, cols, figsize=figsized)
+    _, axs = plt.subplots(rows, cols, figsize=figsize)
 
     real, label, bbox, depth = dataset[idx]
 
@@ -401,22 +399,17 @@ def depth_transform(idx: int, frames: int = 2, transform_idx: list[int] = None, 
 
     #### DISPLAY ORIGINAL ###
 
-    # get depth layout
-    depth_layout = get_depth_layout(depth, real.shape[-2:], bbox)
-
-    axs[0].imshow(depth_layout, cmap='gray')
-    axs[0].set_title('Original depth layout')
-
     coord_box = scale_boxes(
         bbox, dataset.image_size, 'coordinates', dtype=torch.int)
 
     # from [-1,1] to [0,255]
     real = ((real.cpu() + 1) / 2 * 255).type(torch.uint8)
-    # draw boxes
-    real = draw_bounding_boxes(real, coord_box)
+    # # draw boxes
+    # real = draw_bounding_boxes(real, coord_box)
 
-    axs[1].imshow(real.permute(1, 2, 0))
-    axs[1].set_title('Real image')
+    axs[0, 0].imshow(real.permute(1, 2, 0))
+    axs[0, 0].set_title('Real image')
+    axs[0, 0].axis('off')
 
     # sample new noise vectors at each iteration
     z_obj = torch.from_numpy(truncted_random(
@@ -427,8 +420,9 @@ def depth_transform(idx: int, frames: int = 2, transform_idx: list[int] = None, 
     # generate fake
     fake = netGbase.forward(z_obj, bbox.clone().cuda().unsqueeze(
         0), z_im, label.long().cuda()).squeeze()
-    axs[2].imshow(fake.detach().permute(1, 2, 0).cpu()*0.5+0.5)
-    axs[2].set_title('Baseline fake image')
+    axs[0, 1].imshow(fake.detach().permute(1, 2, 0).cpu()*0.5+0.5)
+    axs[0, 1].set_title('Baseline fake image')
+    axs[0, 1].axis('off')
 
     #### TRANSFORM AND GENERATE ####
 
@@ -445,18 +439,21 @@ def depth_transform(idx: int, frames: int = 2, transform_idx: list[int] = None, 
 
         # new depth layout
         depth_layout = get_depth_layout(depth, real.shape[-2:], bbox)
-        axsd[t, 0].imshow(depth_layout, cmap='gray')
+        axs[t+1, 0].imshow(depth_layout, cmap='gray')
         if t == 0:
-            axsd[t, 0].set_title(f'Original depth layout')
+            axs[t+1, 0].set_title(f'Original depth layout')
         else:
-            axsd[t, 0].set_title(f'Modified depth layout {t}')
+            axs[t+1, 0].set_title(f'Modified depth layout {t}')
+
+        axs[t+1, 0].axis('off')
 
         # new fake
         fake = netGdepth.forward(z_obj, bbox.clone().cuda().unsqueeze(
             0), z_im=z_im, y=label.long().cuda(), depths=depth.clone().cuda().unsqueeze(0)).squeeze()
 
-        axsd[t, 1].imshow(fake.detach().permute(1, 2, 0).cpu()*0.5+0.5)
-        axsd[t, 1].set_title(f'Depth-aware fake {t+1}')
+        axs[t+1, 1].imshow(fake.detach().permute(1, 2, 0).cpu()*0.5+0.5)
+        axs[t+1, 1].set_title(f'Depth-aware fake {t+1}')
+        axs[t+1, 1].axis('off')
 
         print(f'Fake {t+1} depths: {[(i, d) for i, d in enumerate(depth)]}')
 
@@ -557,7 +554,7 @@ def move_objects_video(num_gen: int = 23, layout_idx: int = 0, transform_bbox: l
     print(f'Frames saved in {filename}')
 
 
-def knn_analysis(use_depth: bool = True, figunitsize: int = 2, knn_k=16, vis_knn=10):
+def knn_analysis(use_depth: bool = True, figunitsize: int = 2, knn_k: int = 16, vis_knn: int = 10):
     '''
     For a ground truth image the function finds the `knn_k` nearest neighbors in the generated images.
     Then, for a generated image, the function finds the `knn_k` nearest neighbors in the ground truth images.
@@ -585,9 +582,10 @@ def knn_analysis(use_depth: bool = True, figunitsize: int = 2, knn_k=16, vis_knn
     else:
         print(f'Found samples in {fake_path}')
 
-    knn_dict = ev.knn_vis(dataset.image_dir, fake_path, args.dataset, 128, knn_k=knn_k, vis_knn=vis_knn)
+    knn_dict = ev.knn_vis(dataset.image_dir, fake_path,
+                          args.dataset, 128, batch_size=40, knn_k=knn_k, vis_knn=vis_knn)
 
-    figsize = (vis_knn*figunitsize, (knn_k+1)*figunitsize)
+    figsize = ((knn_k+1)*figunitsize, vis_knn*figunitsize)
 
     print('Query ground truths by sample')
     plt.figure(figsize=figsize)
