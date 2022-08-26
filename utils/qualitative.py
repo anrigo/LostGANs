@@ -401,9 +401,6 @@ def depth_transform(idx: int, frames: int = 2, transform_idx: list[int] = None, 
 
     #### DISPLAY ORIGINAL ###
 
-    coord_box = scale_boxes(
-        bbox, dataset.image_size, 'coordinates', dtype=torch.int)
-
     # from [-1,1] to [0,255]
     real = ((real.cpu() + 1) / 2 * 255).type(torch.uint8)
     # # draw boxes
@@ -454,7 +451,7 @@ def depth_transform(idx: int, frames: int = 2, transform_idx: list[int] = None, 
             0), z_im=z_im, y=label.long().cuda(), depths=depth.clone().cuda().unsqueeze(0)).squeeze()
 
         axs[t+1, 1].imshow(fake.detach().permute(1, 2, 0).cpu()*0.5+0.5)
-        axs[t+1, 1].set_title(f'Depth-aware fake {t+1}')
+        axs[t+1, 1].set_title(f'Depth-aware fake {t if t > 0 else ""}')
         axs[t+1, 1].axis('off')
 
         print(f'Fake {t+1} depths: {[(i, d) for i, d in enumerate(depth)]}')
