@@ -180,7 +180,7 @@ def sample_one(idx: int = None, show_labels: bool = False):
     plt.show()
 
 
-def direct_comparison(num_gen: int = 12, cols: int = 6, figunitsize: tuple[int] = 4, visualize_layout: bool = False):
+def direct_comparison(num_gen: int = 8, cols: int = 8, figunitsize: tuple[int] = 3, visualize_layout: bool = False):
     '''
     Sample `num_gen` layout randomly from the dataset, then generate baseline fakes and depth-aware fakes for each one and display the result in a grid.
 
@@ -195,13 +195,10 @@ def direct_comparison(num_gen: int = 12, cols: int = 6, figunitsize: tuple[int] 
 
     for idx in randint(0, len(dataset), num_gen):
         real, label, bbox, depth = dataset[idx]
+        size = real.shape[-2:]
 
         if isinstance(bbox, np.ndarray):
             bbox = torch.from_numpy(bbox)
-
-        # get depth layout
-        depth_layout = get_depth_layout(
-            depth, real.shape[-2:], bbox).unsqueeze(0)
 
         # sample noise vectors
         z_obj = torch.from_numpy(truncted_random(
@@ -218,32 +215,37 @@ def direct_comparison(num_gen: int = 12, cols: int = 6, figunitsize: tuple[int] 
             0), z_im=z_im, y=label.long().cuda(), depths=depth.clone().cuda().unsqueeze(0)).squeeze()
 
         # normalize from [-1,1] to [0,255] and convert to PIL image
-        fake_images_base, fake_images = T.to_pil_image(((fake_images_base.detach() + 1) / 2 * 255).type(
-            torch.uint8).cpu()), T.to_pil_image(((fake_images.detach() + 1) / 2 * 255).type(torch.uint8).cpu())
+        real, fake_images_base, fake_images = T.to_pil_image(((real + 1) / 2 * 255).type(torch.uint8).cpu()), T.to_pil_image(
+            ((fake_images_base.detach() + 1) / 2 * 255).type(torch.uint8).cpu()), T.to_pil_image(((fake_images.detach() + 1) / 2 * 255).type(torch.uint8).cpu())
 
-        base_draw, depth_draw = ImageDraw.Draw(
-            fake_images_base), ImageDraw.Draw(fake_images)
+        real_draw, base_draw, depth_draw = ImageDraw.Draw(
+            real), ImageDraw.Draw(fake_images_base), ImageDraw.Draw(fake_images)
 
+        real_draw.text((0, 0), 'ground truth', (0, 0, 0))
         base_draw.text((0, 0), 'baseline', (0, 0, 0))
         depth_draw.text((0, 0), 'depth-aware', (0, 0, 0))
 
         # stack tensors: depth-layout, baseline fake, depth-aware fake
         # tensors are now in [0,1]
         if visualize_layout:
+            # get depth layout
+            depth_layout = get_depth_layout(
+                depth, size, bbox).unsqueeze(0)
+
             fakes.append(torch.cat((
                 torch.cat((depth_layout, depth_layout, depth_layout), 0), T.to_tensor(
-                    fake_images_base), T.to_tensor(fake_images)
+                    real), T.to_tensor(fake_images_base), T.to_tensor(fake_images)
             ), dim=1))
         else:
-            fakes.append(torch.cat((T.to_tensor(fake_images_base), T.to_tensor(fake_images)
-                                    ), dim=1))
+            fakes.append(torch.cat((T.to_tensor(real), T.to_tensor(
+                fake_images_base), T.to_tensor(fake_images)), dim=1))
 
     # number of stacked images in each frame
-    framestacked = 3 if visualize_layout else 2
+    framestacked = 4 if visualize_layout else 3
 
     # build a grid and plot
     rows = int(num_gen/cols)
-    plt.figure(figsize=(framestacked*figunitsize*rows, figunitsize*cols))
+    plt.figure(figsize=(figunitsize*cols, framestacked*figunitsize*rows)) # (width, height)
     plt.imshow(make_grid(fakes, nrow=cols).permute(1, 2, 0))
     plt.axis('off')
     plt.show()
