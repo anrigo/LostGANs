@@ -1,9 +1,12 @@
+from typing import Union
 import numpy as np
 import torch
 import torch.nn as nn
 from torchvision import models
-import torchvision.transforms as T
+import torchvision.transforms.functional as T
 import torch.nn.functional as F
+from PIL.Image import Image
+from PIL import ImageDraw
 
 
 def crop_resize(image, bbox, imsize=64, cropsize=28, label=None):
@@ -157,3 +160,29 @@ def scale_boxes(boxes: torch.Tensor, shape: 'tuple[int, int]', format: str = Non
             bboxes = bboxes.type(dtype)
 
     return bboxes
+
+
+def draw_text(img: Union[torch.Tensor, Image], text: str, color: tuple[int, int, int] = (0, 0, 0), location: tuple[int, int] = (0, 0)) -> Union[torch.Tensor, Image]:
+    '''
+    Draws text on an image
+
+    Args:
+        img: image
+        text: text to draw
+        color: color of the text
+        location: where the top-left corner of the text will be in the image
+    Returns:
+        img: Image with the desired text, of the same type of the input image. If the input image was a Tensor, the output image will be a Tensor in the range [0,1]
+    '''
+
+    is_tensor = isinstance(img, torch.Tensor)
+    if is_tensor:
+        img = T.to_pil_image(img)
+
+    draw = ImageDraw.Draw(img)
+    draw.text(location, text, color)
+
+    if is_tensor:
+        img = T.to_tensor(img)
+
+    return img

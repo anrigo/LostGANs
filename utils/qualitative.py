@@ -180,7 +180,7 @@ def sample_one(idx: int = None, show_labels: bool = False):
     plt.show()
 
 
-def direct_comparison(num_gen: int = 8, cols: int = 8, figunitsize: tuple[int] = 3, visualize_layout: bool = False):
+def direct_comparison(num_gen: int = 8, cols: int = 8, figunitsize: int = 3, visualize_layout: bool = False):
     '''
     Sample `num_gen` layout randomly from the dataset, then generate baseline fakes and depth-aware fakes for each one and display the result in a grid.
 
@@ -245,13 +245,14 @@ def direct_comparison(num_gen: int = 8, cols: int = 8, figunitsize: tuple[int] =
 
     # build a grid and plot
     rows = int(num_gen/cols)
-    plt.figure(figsize=(figunitsize*cols, framestacked*figunitsize*rows)) # (width, height)
+    plt.figure(figsize=(figunitsize*cols, framestacked *
+               figunitsize*rows))  # (width, height)
     plt.imshow(make_grid(fakes, nrow=cols).permute(1, 2, 0))
     plt.axis('off')
     plt.show()
 
 
-def variable_inputs(variable: list[str], num_gen: int = 23, max_cols: int = 6, figsize: tuple[int] = (18, 12), layout_idx: int = 0, transform_bbox: list[int] = None, transform: Callable = None, show_idx: bool = False, show_labels: bool = False, use_depth: bool = False):
+def variable_inputs(variable: list[str], num_gen: int = 23, max_cols: int = 6, figsize: tuple[int,int] = (18, 12), layout_idx: int = 0, transform_bbox: list[int] = None, transform: Callable = None, show_idx: bool = False, show_labels: bool = False, use_depth: bool = False):
     '''
     Generates multiple images while keeping all inputs fixed except the ones specified in the `variable` parameter
 
@@ -480,6 +481,8 @@ def move_objects_video(num_gen: int = 23, layout_idx: int = 0, transform_bbox: l
         num_o=num_o, thres=thres)).float().cuda()
     z_im = torch.from_numpy(truncted_random(
         num_o=1, thres=thres)).view(1, -1).float().cuda()
+    
+    prev_base = prev_depth = None
 
     for idx in tqdm(range(num_gen), 'Generating frames'):
 
@@ -506,26 +509,43 @@ def move_objects_video(num_gen: int = 23, layout_idx: int = 0, transform_bbox: l
                 else:
                     bbox_cp = transform(box_i, idx, pixels, bbox_cp)
 
-        fake_images = netGdepth.forward(z_obj, bbox_cp.cuda().unsqueeze(
+        fake_images_depth = netGdepth.forward(z_obj, bbox_cp.cuda().unsqueeze(
             0), z_im=z_im, y=label.long().cuda(), depths=depth.cuda().unsqueeze(0))
 
         fake_images_base = netGbase.forward(
             z_obj, bbox_cp.cuda().unsqueeze(0), z_im, label.long().cuda())
 
-        # normalize from [-1,1] to [0,255] and convert to PIL image
-        fake_images_base, fake_images = T.to_pil_image(((fake_images_base.detach().squeeze().cpu() + 1) / 2 * 255).type(
-            torch.uint8)), T.to_pil_image(((fake_images.detach().squeeze().cpu() + 1) / 2 * 255).type(torch.uint8))
+        # normalize from [-1,1] to [0,255]
+        fake_images_base, fake_images_depth = ((fake_images_base.detach().squeeze().cpu() + 1) / 2 * 255).type(
+            torch.uint8), ((fake_images_depth.detach().squeeze().cpu() + 1) / 2 * 255).type(torch.uint8)
+        
+        # frame difference to highlight differences
+        framediff = T.rgb_to_grayscale(fake_images_depth, num_output_channels=3) - T.rgb_to_grayscale(fake_images_base, num_output_channels=3)
+        # framediff = torch.cat((framediff, torch.zeros(fake_images_base.shape)), dim=2)
+        framediff = T.pad(framediff, (0,0,fake_images_base.shape[1],0))
 
-        base_draw, depth_draw = ImageDraw.Draw(
-            fake_images_base), ImageDraw.Draw(fake_images)
+        # difference between subsequent frames to highlight boundaries between objects
+        if prev_base is None:
+            # if it's the first frame, the first difference is set to zero
+            timediff_base = timediff_depth = torch.zeros(fake_images_base.shape)
+        else:
+            timediff_base = T.rgb_to_grayscale(fake_images_base.clone(), num_output_channels=3) - prev_base
+            timediff_depth = T.rgb_to_grayscale(fake_images_depth.clone(), num_output_channels=3) - prev_depth
 
-        base_draw.text((0, 0), 'baseline', (0, 0, 0))
-        depth_draw.text((0, 0), 'depth-aware', (0, 0, 0))
+        prev_base = T.rgb_to_grayscale(fake_images_base.clone(), num_output_channels=3)
+        prev_depth = T.rgb_to_grayscale(fake_images_depth.clone(), num_output_channels=3)
+
+        # add a text description
+        fake_images_base = draw_text(fake_images_base, 'baseline')
+        fake_images_depth = draw_text(fake_images_depth, 'depth-aware')
+
+        fake_images_base = torch.cat((fake_images_base, timediff_base), dim=2)
+        fake_images_depth = torch.cat((fake_images_depth, timediff_depth), dim=2)
 
         # normal on top, depth on bottom
         # tensors are now in [0,1]
         fake_images = torch.cat(
-            (T.to_tensor(fake_images_base), T.to_tensor(fake_images)), dim=1).permute(1, 2, 0)
+            (fake_images_base, fake_images_depth, framediff), dim=1).permute(1, 2, 0)
 
         # back to [0,255] uint8
         fakes.append(
