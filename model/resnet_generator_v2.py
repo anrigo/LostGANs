@@ -159,13 +159,20 @@ class ResnetGenerator128(nn.Module):
 
 
 class ResnetGeneratorTransfFeats128(nn.Module):
-    def __init__(self, ch=64, z_dim=128, num_classes=10, num_o=20, output_dim=3):
+    def __init__(self, ch=64, z_dim=128, num_classes=10, num_o=20, output_dim=3, attntype='default'):
         super(ResnetGeneratorTransfFeats128, self).__init__()
         self.num_classes = num_classes
 
         self.label_embedding = nn.Embedding(num_classes, 180)
 
         num_w = 128+180
+
+        # attention type
+        context_dim, crossonly = {
+            'default': (1, False),
+            'selfonly': (None, False),
+            'crossonly': (1, True)
+        }[attntype]
 
         # transformer blocks parameters
         transf_depth = 1
@@ -183,7 +190,7 @@ class ResnetGeneratorTransfFeats128(nn.Module):
         self.res4 = ResBlock(ch*4, ch*2, upsample=True, num_w=num_w, psp_module=True)
         self.res5 = ResBlock(ch*2, ch*1, upsample=True, num_w=num_w, predict_mask=False)
 
-        self.transf3 = TransformerBlock(dim=ch*4, context_dim=1, heads=num_heads, dim_head=dim_heads, depth=transf_depth, crossonly=False)
+        self.transf3 = TransformerBlock(dim=ch*4, context_dim=context_dim, heads=num_heads, dim_head=dim_heads, depth=transf_depth, crossonly=crossonly)
 
         self.final = nn.Sequential(BatchNorm(ch),
                                    nn.ReLU(),
