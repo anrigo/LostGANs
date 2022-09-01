@@ -113,8 +113,7 @@ class Attention(nn.Module):
 
         # add text conditioning, if present
 
-        if exists(context):
-            assert exists(self.to_context)
+        if exists(context) and exists(self.to_context):
             ck, cv = self.to_context(context).chunk(2, dim=-1)
 
             if not self.crossonly:
