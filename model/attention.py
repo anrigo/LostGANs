@@ -97,11 +97,14 @@ class Attention(nn.Module):
         )
 
     def forward(self, x, context=None, mask=None, attn_bias=None):
+        # n = h*w
         b, n, device = *x.shape[:2], x.device
 
+        # (b, n, c)
         x = self.norm(x)
+        # (b, n, dim), (b, n, dim_head), (b, n, dim_head)
         q, k, v = (self.to_q(x), *self.to_kv(x).chunk(2, dim=-1))
-
+        # (b, heads, n, dim_head)
         q = rearrange(q, 'b n (h d) -> b h n d', h=self.heads)
         q = q * self.scale
 
@@ -114,9 +117,11 @@ class Attention(nn.Module):
         # add text conditioning, if present
 
         if exists(context) and exists(self.to_context):
+            # (b, num_o, dim_head)
             ck, cv = self.to_context(context).chunk(2, dim=-1)
 
             if not self.crossonly:
+                # (b, n+num_o, dim_head)
                 k = torch.cat((ck, k), dim=-2)
                 v = torch.cat((cv, v), dim=-2)
             else:
@@ -128,7 +133,7 @@ class Attention(nn.Module):
             q, k = map(l2norm, (q, k))
 
         # calculate query / key similarities
-
+        # (b, heads, n, n+num_o)
         sim = einsum('b h i d, b j d -> b h i j', q, k) * self.cosine_sim_scale
 
         # relative positional encoding (T5 style)
@@ -146,13 +151,13 @@ class Attention(nn.Module):
             sim = sim.masked_fill(~mask, max_neg_value)
 
         # attention
-
+        # (b, heads, n, n+num_o)
         attn = sim.softmax(dim=-1)
 
         # aggregate values
-
+        # (b, heads, n, dim_head)
         out = einsum('b h i j, b j d -> b h i d', attn, v)
-
+        # (b, n, heads*dim_head)
         out = rearrange(out, 'b h n d -> b n (h d)')
         return self.to_out(out)
 

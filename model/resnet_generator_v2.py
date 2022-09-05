@@ -305,10 +305,9 @@ class ResnetGeneratorTransfFeats128(nn.Module):
         alpha3 = torch.gather(self.sigmoid(self.alpha3).expand(b, -1, -1), dim=1, index=y.view(b, o, 1)).unsqueeze(-1) 
         stage_bbox = F.interpolate(bmask, size=(hh, ww), mode='bilinear') * (1 - alpha3) + seman_bbox * alpha3
 
+        # (batch, c, h, w)
         # apply feats-depth attention
         x = self.transf3(x, context=depths.clone())
-        # apply self-attention only
-        # x = self.transf3(x)
 
         x, stage_mask = self.res4(x, w, stage_bbox)
 
