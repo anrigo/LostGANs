@@ -1,5 +1,6 @@
 import argparse
 from collections import OrderedDict
+from operator import index
 import os
 from pathlib import Path
 import shutil
@@ -10,6 +11,7 @@ from model.resnet_generator_v2 import ResnetGenerator128, ResnetGeneratorTransfF
 from utils.evaluation import compute_metrics
 from data.datasets import get_dataset, get_num_classes_and_objects
 from utils.util import truncted_random
+from pandas import DataFrame
 
 
 def sample_test(netG, dataset, num_obj, sample_path, lpips_samples=100):
@@ -82,7 +84,51 @@ def sample_test(netG, dataset, num_obj, sample_path, lpips_samples=100):
                 "{save_path}/sample_{idx}.jpg".format(save_path=alt_path, idx=idx), result_alt)
 
 
-def main(args):
+def model_sel(args):
+    '''Computes validation fid on multiple checkpoints of a model, then computes test fid on the best model'''
+    weights_path = os.path.join(
+        'outputs', args.dataset + '-' + args.model, 'model')
+    models = os.listdir(weights_path)
+    results = {'model': [], 'val_fid': []}
+
+    for ii, model in enumerate(models):
+        print(f'[{ii+1}/{len(models)}] Evaluating {args.model} checkpoints')
+        args.model_path = os.path.join(weights_path, model)
+        print(f'Evaluating {args.model_path}')
+        metrics = test(args, 'val')
+        results['model'].append(model)
+        results['val_fid'].append(metrics['val_fid'])
+
+    min_idx = results['val_fid'].index(min(results['val_fid']))
+
+    print(f"Testing {results['model'][min_idx]} on the test set")
+    args.model_path = os.path.join(weights_path, results['model'][min_idx])
+    metrics = test(args, 'test')
+    best_res = {'model': [results['model'][min_idx]],
+                'fid (test set)': [metrics['val_fid']]}
+
+    results['model'][min_idx] = f"**{results['model'][min_idx]}**"
+    results['val_fid'][min_idx] = f"**{results['val_fid'][min_idx]}**"
+
+    str_res = DataFrame.from_dict(results).to_markdown(index=False)
+    str_best = DataFrame.from_dict(best_res).to_markdown(index=False)
+
+    savepath = os.path.join('outputs', args.dataset +
+                            '-' + args.model, 'results.txt')
+    print(f'Saving to {savepath}')
+    with open(savepath, 'w') as f:
+        print(f'\nResults for: {args.model}')
+        print(str_res)
+        f.write(f'Results for: {args.model}\n')
+        f.write(str_res)
+
+        print('\nBest model')
+        print(str_best)
+        f.write('\n\nBest model\n')
+        f.write(str_best)
+
+
+def test(args, split='test'):
     num_classes, num_obj = get_num_classes_and_objects(args.dataset)
 
     # output directory samples/dataset-model_name
@@ -90,7 +136,7 @@ def main(args):
         args.sample_path, args.dataset + '-' + args.model)
 
     # get test dataset
-    dataset = get_dataset(args.dataset, 128, 'test',
+    dataset = get_dataset(args.dataset, 128, split,
                           num_obj=num_obj,
                           return_depth=args.use_depth)
 
@@ -137,6 +183,8 @@ def main(args):
         print('Cleaning')
         shutil.rmtree(args.sample_path)
 
+    return metrics_dict
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -152,6 +200,8 @@ if __name__ == "__main__":
                         default=False, help='if true, the sampled images won\'t be deleted')
     parser.add_argument('--model', type=str, default='baseline',
                         help='short model name')
+    parser.add_argument('--sel', action=argparse.BooleanOptionalAction,
+                        default=False, help='if true, runs model selection')
     args = parser.parse_args()
 
     # args.dataset = 'clevr-rubber'
@@ -160,4 +210,7 @@ if __name__ == "__main__":
     # args.model = 'depth-latent'
     # args.keep = True
 
-    main(args)
+    if args.sel:
+        model_sel(args)
+    else:
+        test(args)
