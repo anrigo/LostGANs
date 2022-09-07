@@ -167,7 +167,9 @@ class ResnetGeneratorTransfFeats128(nn.Module):
 
         num_w = 128+180
 
+
         # attention type
+        self.attntype = attntype
         context_dim, crossonly = {
             'default': (1, False),
             'selfonly': (None, False),
@@ -211,7 +213,7 @@ class ResnetGeneratorTransfFeats128(nn.Module):
         self.mask_regress = MaskRegressNetv2(num_w)
         self.init_parameter()
 
-    def forward(self, z, bbox, y, depths, z_im=None) -> torch.Tensor:
+    def forward(self, z, bbox, y, depths, z_im=None, return_attn=False) -> torch.Tensor:
         # z shape: batch, number of objects, latent code length
 
         # b = batch size, o = number of objects/latents
@@ -307,7 +309,7 @@ class ResnetGeneratorTransfFeats128(nn.Module):
 
         # (batch, c, h, w)
         # apply feats-depth attention
-        x = self.transf3(x, context=depths.clone())
+        x, attn = self.transf3(x, context=depths.clone(), return_attn=return_attn)
 
         x, stage_mask = self.res4(x, w, stage_bbox)
 
@@ -323,6 +325,9 @@ class ResnetGeneratorTransfFeats128(nn.Module):
 
         # to RGB
         x = self.final(x)
+
+        if return_attn:
+            return x, attn
         return x
 
     def init_parameter(self):

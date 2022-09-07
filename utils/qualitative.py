@@ -7,6 +7,7 @@ from utils.util import *
 import matplotlib.pyplot as plt
 from torchvision.utils import draw_bounding_boxes, make_grid
 import torchvision.transforms.functional as T
+from skimage.transform import pyramid_expand
 from PIL import ImageDraw
 from typing import Union, Callable
 from utils.depth import get_depth_layout
@@ -124,7 +125,7 @@ def sample_one(idx: int = None, show_labels: bool = False):
     # display layout by
     # displaying bounding boxes on a black tensor
     layout = torch.zeros(3, 128, 128).type(torch.uint8)
-    layout = draw_bboxes(layout, bbox, labels, show_idx=True, text=False)
+    layout = draw_bboxes(layout, bbox, labels, show_idx=True, text=show_labels)
 
     axs[ax_id].imshow(layout.permute(1, 2, 0))
     axs[ax_id].set_title('Layout with indices')
@@ -651,6 +652,68 @@ def knn_analysis(use_depth: bool = True, figunitsize: int = 2, knn_k: int = 16, 
     plt.imshow(make_grid([T.to_tensor(wandb_img.image)
                for wandb_img in knn_dict['knn_inception_query_sample_by_gt']], nrow=1).permute(1, 2, 0))
     plt.axis('off')
+    plt.show()
+
+
+def visualize_attention(idx: int = None, show_labels: bool = False):
+    '''
+    Generates a fake image with the depth-aware model and plots the attention map
+
+    Args:
+        idx: image position in the dataset. If none is specified a random one will be selected
+        show_labels: if True the labels will be visualized on the layout
+    '''
+
+    # if no image is specified, select a random one
+    idx = int(np.ceil(np.random.random()*len(dataset)) -
+              1) if idx is None else idx
+    print(f'Image: {idx}')
+
+    # control plot order and size
+    cols, figH = (3, 4)
+    figsize = (figH*cols, figH)
+
+    _, axs = plt.subplots(1, cols, figsize=figsize)
+
+    real, labels, bbox, depth = dataset[idx]
+
+    if isinstance(bbox, np.ndarray):
+        bbox = torch.from_numpy(bbox)
+
+    # get depth layout
+    depth_layout = get_depth_layout(depth, real.shape[-2:], bbox)
+
+    axs[0].imshow(depth_layout, cmap='gray')
+    axs[0].set_title('Depth layout')
+
+    # sample noise vectors
+    z_obj = torch.from_numpy(truncted_random(
+        num_o=num_o, thres=thres)).float().cuda()
+    z_im = torch.from_numpy(truncted_random(
+        num_o=1, thres=thres)).view(1, -1).float().cuda()
+
+    # sample depth-aware
+    fake, attn = netGdepth.forward(z_obj, bbox.clone().cuda().unsqueeze(
+        0), z_im=z_im, y=labels.clone().long().cuda(), depths=depth.cuda().unsqueeze(0), return_attn=True)
+
+    # normalize from [-1,1] to [0,1]
+    fake = fake.detach().squeeze().permute(
+        1, 2, 0).cpu() * 0.5 + 0.5
+    
+    axs[1].imshow(fake)
+    axs[1].set_title('Fake image')
+
+    # normalize from [-1,1] to [0,255]
+    real = ((real.cpu() + 1) / 2 * 255).type(torch.uint8).permute(1,2,0)
+
+    attnmap = attn.detach().squeeze().max(dim=-1).values.cpu().numpy()
+    attnmap = pyramid_expand(attnmap[0], upscale=int(real.shape[0]/attnmap.shape[1]), sigma=8)
+
+    axs[2].imshow(real)
+    axs[2].set_title('Attention head 0')
+    axs[2].imshow(attnmap, alpha=0.7, cmap='Greys_r')
+    for ax in axs:
+        ax.axis('off')
     plt.show()
 
 

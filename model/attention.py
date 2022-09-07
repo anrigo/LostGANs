@@ -2,7 +2,6 @@ import torch
 import torch.functional as F
 from torch import nn, einsum
 from einops import rearrange
-from einops_exts.torch import EinopsToAndFrom
 
 
 def exists(val):
@@ -159,7 +158,27 @@ class Attention(nn.Module):
         out = einsum('b h i j, b j d -> b h i d', attn, v)
         # (b, n, heads*dim_head)
         out = rearrange(out, 'b h n d -> b n (h d)')
-        return self.to_out(out)
+        return self.to_out(out), attn
+
+
+class EinopsToAndFromTuple(nn.Module):
+    def __init__(self, from_einops, to_einops, fn):
+        super().__init__()
+        self.from_einops = from_einops
+        self.to_einops = to_einops
+        self.fn = fn
+
+    def forward(self, x, **kwargs):
+        shape = x.shape
+        reconstitute_kwargs = dict(tuple(zip(self.from_einops.split(' '), shape)))
+        x = rearrange(x, f'{self.from_einops} -> {self.to_einops}')
+        x = self.fn(x, **kwargs)
+
+        if isinstance(x, tuple):
+            x, *rest = x
+
+        x = rearrange(x, f'{self.to_einops} -> {self.from_einops}', **reconstitute_kwargs)
+        return x, *rest
 
 
 class TransformerBlock(nn.Module):
@@ -195,14 +214,19 @@ class TransformerBlock(nn.Module):
 
         for _ in range(depth):
             self.layers.append(nn.ModuleList([
-                EinopsToAndFrom('b c h w', 'b (h w) c',
+                EinopsToAndFromTuple('b c h w', 'b (h w) c',
                                 Attention(dim=dim, heads=heads, dim_head=dim_head,
                                           context_dim=context_dim, cosine_sim_attn=cosine_sim_attn, crossonly=crossonly)),
                 ChanFeedForward(dim=dim, mult=ff_mult)
             ]))
 
-    def forward(self, x, context=None):
+    def forward(self, x, context=None, return_attn=False):
         for attn, ff in self.layers:
-            x = attn(x, context=context) + x
+            # x = attn(x, context=context) + x
+            ft, attn_scores = attn(x, context=context)
+            x = ft + x
             x = ff(x) + x
+        if return_attn:
+            h, w = x.shape[-2:]
+            return x, attn_scores.view(*attn_scores.shape[:2], h, w, -1)
         return x
