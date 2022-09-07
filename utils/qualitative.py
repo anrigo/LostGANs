@@ -655,12 +655,13 @@ def knn_analysis(use_depth: bool = True, figunitsize: int = 2, knn_k: int = 16, 
     plt.show()
 
 
-def visualize_attention(idx: int = None, show_labels: bool = False):
+def visualize_attention(idx: int = None, head: int = 0, show_labels: bool = False):
     '''
     Generates a fake image with the depth-aware model and plots the attention map
 
     Args:
         idx: image position in the dataset. If none is specified a random one will be selected
+        head: attention head to display
         show_labels: if True the labels will be visualized on the layout
     '''
 
@@ -707,10 +708,10 @@ def visualize_attention(idx: int = None, show_labels: bool = False):
     real = ((real.cpu() + 1) / 2 * 255).type(torch.uint8).permute(1,2,0)
 
     attnmap = attn.detach().squeeze().max(dim=-1).values.cpu().numpy()
-    attnmap = pyramid_expand(attnmap[0], upscale=int(real.shape[0]/attnmap.shape[1]), sigma=8)
+    attnmap = pyramid_expand(attnmap[0], upscale=int(real.shape[0]/attnmap.shape[1]), sigma=6)
 
     axs[2].imshow(real)
-    axs[2].set_title('Attention head 0')
+    axs[2].set_title(f'Attention head {head}')
     axs[2].imshow(attnmap, alpha=0.7, cmap='Greys_r')
     for ax in axs:
         ax.axis('off')
