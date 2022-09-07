@@ -707,7 +707,9 @@ def visualize_attention(idx: int = None, head: int = 0, show_labels: bool = Fals
     # normalize from [-1,1] to [0,255]
     real = ((real.cpu() + 1) / 2 * 255).type(torch.uint8).permute(1,2,0)
 
+    # take the max attention score for each feature map pixel
     attnmap = attn.detach().squeeze().max(dim=-1).values.cpu().numpy()
+    # upscale for visualization
     attnmap = pyramid_expand(attnmap[0], upscale=int(real.shape[0]/attnmap.shape[1]), sigma=6)
 
     axs[2].imshow(real)
