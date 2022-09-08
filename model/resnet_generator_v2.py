@@ -309,7 +309,7 @@ class ResnetGeneratorTransfFeats128(nn.Module):
 
         # (batch, c, h, w)
         # apply feats-depth attention
-        x, attn = self.transf3(x, context=depths.clone(), return_attn=return_attn)
+        x, attn = self.transf3(x, context=depths.clone(), return_attn=True)
 
         x, stage_mask = self.res4(x, w, stage_bbox)
 

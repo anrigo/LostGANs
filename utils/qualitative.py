@@ -563,7 +563,7 @@ def move_objects_video(num_gen: int = 23, layout_idx: int = 0, transform_bbox: l
                            255).unsqueeze(0).expand(3, -1, -1)
 
         # add a text description
-        c_red = (255,0,0)
+        c_red = (255, 0, 0)
         fake_images_base = draw_text(fake_images_base, 'baseline')
         fake_images_depth = draw_text(fake_images_depth, 'depth-aware')
         timediff_base = draw_text(timediff_base, 'timediff', c_red)
@@ -585,8 +585,8 @@ def move_objects_video(num_gen: int = 23, layout_idx: int = 0, transform_bbox: l
         fakes.append(
             (fake_images*255).type(torch.uint8).numpy().astype(np.uint8))
 
-    if not Path('samples/vids/'+ args.model_depth_name).is_dir():
-        os.makedirs('samples/vids/'+ args.model_depth_name)
+    if not Path('samples/vids/' + args.model_depth_name).is_dir():
+        os.makedirs('samples/vids/' + args.model_depth_name)
 
     h, w, c = fakes[1].shape
     filename = f'samples/vids/{args.model_depth_name}/{args.dataset}_{vid_name}_{layout_idx}.avi'
@@ -655,13 +655,14 @@ def knn_analysis(use_depth: bool = True, figunitsize: int = 2, knn_k: int = 16, 
     plt.show()
 
 
-def visualize_attention(idx: int = None, head: int = 0, show_labels: bool = False):
+def visualize_attention(idx: int = None, head: int = 0, separate: bool = False, show_labels: bool = False):
     '''
     Generates a fake image with the depth-aware model and plots the attention map
 
     Args:
         idx: image position in the dataset. If none is specified a random one will be selected
         head: attention head to display
+        separate: plot self-attention and cross-attention weights separately
         show_labels: if True the labels will be visualized on the layout
     '''
 
@@ -681,11 +682,11 @@ def visualize_attention(idx: int = None, head: int = 0, show_labels: bool = Fals
     if isinstance(bbox, np.ndarray):
         bbox = torch.from_numpy(bbox)
 
-    # get depth layout
-    depth_layout = get_depth_layout(depth, real.shape[-2:], bbox)
+    # normalize from [-1,1] to [0,255]
+    real = ((real.cpu() + 1) / 2 * 255).type(torch.uint8).permute(1, 2, 0)
 
-    axs[0].imshow(depth_layout, cmap='gray')
-    axs[0].set_title('Depth layout')
+    axs[0].imshow(real)
+    axs[0].set_title('Ground truth')
 
     # sample noise vectors
     z_obj = torch.from_numpy(truncted_random(
@@ -700,17 +701,16 @@ def visualize_attention(idx: int = None, head: int = 0, show_labels: bool = Fals
     # normalize from [-1,1] to [0,1]
     fake = fake.detach().squeeze().permute(
         1, 2, 0).cpu() * 0.5 + 0.5
-    
+
     axs[1].imshow(fake)
     axs[1].set_title('Fake image')
 
-    # normalize from [-1,1] to [0,255]
-    real = ((real.cpu() + 1) / 2 * 255).type(torch.uint8).permute(1,2,0)
-
     # take the max attention score for each feature map pixel
     attnmap = attn.detach().squeeze().max(dim=-1).values.cpu().numpy()
+
     # upscale for visualization
-    attnmap = pyramid_expand(attnmap[0], upscale=int(real.shape[0]/attnmap.shape[1]), sigma=6)
+    attnmap = pyramid_expand(attnmap[head]/attnmap[head].max(), upscale=int(
+        real.shape[0]/attnmap.shape[1]), sigma=6)
 
     axs[2].imshow(real)
     axs[2].set_title(f'Attention head {head}')
@@ -718,6 +718,36 @@ def visualize_attention(idx: int = None, head: int = 0, show_labels: bool = Fals
     for ax in axs:
         ax.axis('off')
     plt.show()
+
+    if separate and netGdepth.attntype == 'default':
+        # display the two types of attention separately
+        cols, figH = (2, 4)
+        figsize = (figH*cols, figH)
+
+        _, axs = plt.subplots(1, cols, figsize=figsize)
+        attnmap = attn.detach().squeeze(
+        )[..., 0:-num_o].max(dim=-1).values.cpu().numpy()
+        print(
+            f'self-attn [min/max]: {attnmap[head].min()} / {attnmap[head].max()}')
+        attnmap = pyramid_expand(attnmap[head]/attnmap[head].max(), upscale=int(
+            real.shape[0]/attnmap.shape[1]), sigma=6)
+        axs[0].imshow(real)
+        axs[0].set_title(f'Attention head {head} self-attn')
+        axs[0].imshow(attnmap, alpha=0.7, cmap='Greys_r')
+
+        attnmap = attn.detach().squeeze(
+        )[..., -num_o:].max(dim=-1).values.cpu().numpy()
+        print(
+            f'cross-attn [min/max]: {attnmap[head].min()} / {attnmap[head].max()}')
+        attnmap = pyramid_expand(attnmap[head]/attnmap[head].max(), upscale=int(
+            real.shape[0]/attnmap.shape[1]), sigma=6)
+        axs[1].imshow(real)
+        axs[1].set_title(f'Attention head {head} cross-attn')
+        axs[1].imshow(attnmap, alpha=0.7, cmap='Greys_r')
+
+        for ax in axs:
+            ax.axis('off')
+        plt.show()
 
 
 class transforms:
