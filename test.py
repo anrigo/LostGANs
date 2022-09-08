@@ -132,7 +132,7 @@ def test(args, split='test'):
     num_classes, num_obj = get_num_classes_and_objects(args.dataset)
 
     # output directory samples/dataset-model_name
-    args.sample_path = os.path.join(
+    sample_path = os.path.join(
         args.sample_path, args.dataset + '-' + args.model)
 
     # get test dataset
@@ -169,19 +169,19 @@ def test(args, split='test'):
 
     # Sample fake images
     print(f'Sampling {len(dataset)} fake images')
-    sample_test(netG, dataset, num_obj, args.sample_path)
+    sample_test(netG, dataset, num_obj, sample_path)
 
     # compute metrics
     print('Computing metrics')
     metrics_dict = compute_metrics(
-        dataset.image_dir, args.sample_path, 50)
+        dataset.image_dir, sample_path, 50)
 
     print(f'METRICS: {metrics_dict}')
 
     if not args.keep:
         # clean
         print('Cleaning')
-        shutil.rmtree(args.sample_path)
+        shutil.rmtree(sample_path)
 
     return metrics_dict
 
