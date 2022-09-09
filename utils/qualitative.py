@@ -719,6 +719,9 @@ def visualize_attention(idx: int = None, head: int = 0, separate: bool = False, 
     # take the max attention score for each feature map pixel
     attnmap = attn.detach().squeeze().max(dim=-1).values.cpu().numpy()
 
+    print(
+        f'attn [min/max]: {attnmap[head].min()} / {attnmap[head].max()}')
+
     # upscale for visualization
     attnmap = pyramid_expand(attnmap[head]/attnmap[head].max(), upscale=int(
         real.shape[0]/attnmap.shape[1]), sigma=6)
