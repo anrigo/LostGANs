@@ -492,11 +492,6 @@ def move_objects_video(num_gen: int = 23, layout_idx: int = 0, transform_bbox: l
 
             if isinstance(bbox, np.ndarray):
                 bbox = torch.from_numpy(bbox)
-
-            layout = torch.zeros(3, 128, 128).type(torch.uint8)
-            layout = draw_bboxes(
-                layout, bbox, label, text=False, show_idx=True, color_transform=transform_bbox)
-            fakes.append(layout.permute(1, 2, 0))
             bbox_cp = bbox.clone()
 
         if not transform_bbox is None and idx > 0:
@@ -518,28 +513,41 @@ def move_objects_video(num_gen: int = 23, layout_idx: int = 0, transform_bbox: l
 
         # normalize from [-1,1] to [0,255]
         fake_images_base = (
-            (fake_images_base.detach().squeeze().cpu() + 1) / 2 * 255).type(torch.uint8)
+            (fake_images_base.detach().squeeze().cpu() + 1) / 2).permute(1, 2, 0)
         fake_images_depth = (
-            (fake_images_depth.detach().squeeze().cpu() + 1) / 2 * 255).type(torch.uint8)
+            (fake_images_depth.detach().squeeze().cpu() + 1) / 2).permute(1, 2, 0)
 
-        # difference between subsequent frames to highlight boundaries between objects
+        # distance between subsequent frames to highlight boundaries between objects
         if prev_base is None:
             # if it's the first frame, the first difference is set to zero
-            timediff_base = timediff_depth = torch.zeros(
-                fake_images_base.shape)
+            timedist_base = timedist_depth = torch.zeros(
+                fake_images_base.shape[::-1])
         else:
-            timediff_base = T.rgb_to_grayscale(
-                fake_images_base.clone(), num_output_channels=3) - prev_base
-            timediff_depth = T.rgb_to_grayscale(
-                fake_images_depth.clone(), num_output_channels=3) - prev_depth
+            # euclidean distance between pixels
+            timedist_base = (fake_images_base -
+                             prev_base).pow(2).sum(dim=2).sqrt()
+            timedist_base = (timedist_base/timedist_base.max()
+                             ).unsqueeze(0).expand(3, -1, -1).clone()
 
-        prev_base = T.rgb_to_grayscale(
-            fake_images_base.clone(), num_output_channels=3)
-        prev_depth = T.rgb_to_grayscale(
-            fake_images_depth.clone(), num_output_channels=3)
+            timedist_depth = (fake_images_depth -
+                              prev_depth).pow(2).sum(dim=2).sqrt()
+            timedist_depth = (timedist_depth/timedist_depth.max()
+                              ).unsqueeze(0).expand(3, -1, -1).clone()
 
-        fake_edge_base = fake_images_base.clone().permute(1, 2, 0).numpy()
-        fake_edge_depth = fake_images_depth.clone().permute(1, 2, 0).numpy()
+        prev_base = fake_images_base.clone()
+        prev_depth = fake_images_depth.clone()
+
+        # distance between the two models
+        framedist = (fake_images_base -
+                     fake_images_depth).pow(2).sum(dim=2).sqrt()
+        framedist = (framedist/framedist.max()
+                     ).unsqueeze(0).expand(3, -1, -1).clone()
+
+        fake_images_base = (fake_images_base*255).type(torch.uint8)
+        fake_images_depth = (fake_images_depth*255).type(torch.uint8)
+
+        fake_edge_base = fake_images_base.clone().numpy()
+        fake_edge_depth = fake_images_depth.clone().numpy()
 
         # compute Canny lower and upper thresholds based on median
         vb = np.median(fake_edge_base)
@@ -558,28 +566,31 @@ def move_objects_video(num_gen: int = 23, layout_idx: int = 0, transform_bbox: l
         # from [0,255] to [0,1]
         # expand the tensor so it goes from single-channel image to a 3-channel one
         fake_edge_base = (torch.from_numpy(fake_edge_base) /
-                          255).unsqueeze(0).expand(3, -1, -1)
+                          255).unsqueeze(0).expand(3, -1, -1).clone()
         fake_edge_depth = (torch.from_numpy(fake_edge_depth) /
-                           255).unsqueeze(0).expand(3, -1, -1)
+                           255).unsqueeze(0).expand(3, -1, -1).clone()
 
         # add a text description
         c_red = (255, 0, 0)
-        fake_images_base = draw_text(fake_images_base, 'baseline')
-        fake_images_depth = draw_text(fake_images_depth, 'depth-aware')
-        timediff_base = draw_text(timediff_base, 'timediff', c_red)
-        timediff_depth = draw_text(timediff_depth, 'timediff', c_red)
+        fake_images_base = draw_text(
+            fake_images_base.permute(2, 0, 1), 'baseline')
+        fake_images_depth = draw_text(
+            fake_images_depth.permute(2, 0, 1), 'depth-aware')
+        timedist_base = draw_text(timedist_base, 'timedist', c_red)
+        timedist_depth = draw_text(timedist_depth, 'timedist', c_red)
+        framedist = draw_text(framedist, 'framedist', c_red)
         fake_edge_base = draw_text(fake_edge_base, 'edges', c_red)
         fake_edge_depth = draw_text(fake_edge_depth, 'edges', c_red)
 
         fake_images_base = torch.cat(
-            (fake_images_base, timediff_base, fake_edge_base), dim=2)
+            (fake_images_base, timedist_base, fake_edge_base), dim=2)
         fake_images_depth = torch.cat(
-            (fake_images_depth, timediff_depth, fake_edge_depth), dim=2)
+            (fake_images_depth, timedist_depth, fake_edge_depth), dim=2)
 
         # normal on top, depth on bottom
         # tensors are now in [0,1]
         fake_images = torch.cat(
-            (fake_images_base, fake_images_depth), dim=1).permute(1, 2, 0)
+            (fake_images_base, fake_images_depth, T.pad(framedist, (0, 0, fake_images_base.shape[1]*2, 0))), dim=1).permute(1, 2, 0)
 
         # back to [0,255] uint8
         fakes.append(
