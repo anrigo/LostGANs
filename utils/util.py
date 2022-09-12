@@ -186,3 +186,8 @@ def draw_text(img: Union[torch.Tensor, Image], text: str, color: tuple[int, int,
         img = T.to_tensor(img)
 
     return img
+
+
+def count_parameters(model: nn.Module):
+    '''Returns the number of parameters of a model'''
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
