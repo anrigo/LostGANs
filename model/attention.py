@@ -107,13 +107,7 @@ class Attention(nn.Module):
         q = rearrange(q, 'b n (h d) -> b h n d', h=self.heads)
         q = q * self.scale
 
-        # add null key / value for classifier free guidance in prior net
-
-        # nk, nv = repeat_many(self.null_kv.unbind(dim=-2), 'd -> b 1 d', b=b)
-        # k = torch.cat((nk, k), dim=-2)
-        # v = torch.cat((nv, v), dim=-2)
-
-        # add text conditioning, if present
+        # add depth conditioning, if present
 
         if exists(context) and exists(self.to_context):
             # (b, num_o, dim_head)
