@@ -95,7 +95,7 @@ class Attention(nn.Module):
             LayerNorm(dim)
         )
 
-    def forward(self, x, context=None, mask=None, attn_bias=None):
+    def forward(self, x, context=None, mask=None, attn_bias=None, depth_scale=None):
         # n = h*w
         b, n, device = *x.shape[:2], x.device
 
@@ -133,6 +133,11 @@ class Attention(nn.Module):
 
         if exists(attn_bias):
             sim = sim + attn_bias
+
+        # artificially increasing depth attention scores
+
+        if exists(depth_scale):
+            sim[..., n:] *= depth_scale
 
         # masking
 
