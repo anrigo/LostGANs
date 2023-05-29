@@ -1,4 +1,4 @@
-Attempt to improve LostGANv2 occlusion handling capabilities through depth-awareness.
+Improving LostGANv2 occlusion handling capabilities through depth-awareness.
 Fork of [LostGANs](https://github.com/WillSuen/LostGANs)
 
 # Setup
